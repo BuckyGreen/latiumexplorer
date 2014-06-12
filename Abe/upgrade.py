@@ -934,7 +934,7 @@ def insert_chain_novacoin(store):
 def add_transparency_tables(store):
     store.ddl("""
         CREATE TABLE balances (
-            id         TINYINT      NOT NULL AUTO INCREMENT,
+            id         TINYINT      NOT NULL,
             balance    NUMERIC(20)  NOT NULL,
             name       VARCHAR(7)   NOT NULL,
             pubkey_id  NUMERIC(26)  NULL,
@@ -964,6 +964,8 @@ def add_transparency_tables(store):
         ["Admin Wallet",   "AdeFHiHAvw1ADDPL8FgfPb3DDaTKZuKx1i"],
     ]
         
+    addr_id = 0
+
     for name, addr in initialAddrs:
 
         version, binaddr = util.decode_check_address(addr)
@@ -977,12 +979,14 @@ def add_transparency_tables(store):
         counts = store.get_address_counts(dbhash)
 
         store.sql(
-            "INSERT INTO balances VALUES (DEFAULT, ?, ?, ?)",
-            (counts["balance"], name, addr_id)
+            "INSERT INTO balances VALUES (?, ?, ?, ?)",
+            (addr_id, counts["balance"], name, addr_id)
         )
+
+        addr_id += 1
     
     # Also add detroyed coins
-    store.sql("INSERT INTO balances VALUES (DEFAULT, 0, 'Destroyed Coins', DEFAULT)")
+    store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (addr_id,))
 
 upgrades = [
     ('6',    add_block_value_in),
