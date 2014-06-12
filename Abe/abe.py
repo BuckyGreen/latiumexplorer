@@ -1075,40 +1075,14 @@ class Abe:
 
         if too_many:
             # Get counts, not transactions
-            row = abe.store.selectall("""
-                SELECT
-                    SUM(txout.txout_value),
-                    COUNT(*),
-                    cc.chain_id
-                  FROM chain_candidate cc
-                  JOIN block b ON (b.block_id = cc.block_id)
-                  JOIN block_tx ON (block_tx.block_id = b.block_id)
-                  JOIN tx ON (tx.tx_id = block_tx.tx_id)
-                  JOIN txout ON (txout.tx_id = tx.tx_id)
-                  JOIN pubkey ON (pubkey.pubkey_id = txout.pubkey_id)
-                 WHERE pubkey.pubkey_hash = ?
-                   AND cc.in_longest = 1""", (dbhash,))[0]
-            chain_id = row[2]
-            received[chain_id] = row[0];
-            balance[chain_id] = row[0];
-            count[0] = row[1];
-            row = abe.store.selectall("""
-                SELECT
-                    SUM(-prevout.txout_value),
-                    COUNT(*)
-                  FROM chain_candidate cc
-                  JOIN block b ON (b.block_id = cc.block_id)
-                  JOIN block_tx ON (block_tx.block_id = b.block_id)
-                  JOIN tx ON (tx.tx_id = block_tx.tx_id)
-                  JOIN txin ON (txin.tx_id = tx.tx_id)
-                  JOIN txout prevout ON (txin.txout_id = prevout.txout_id)
-                  JOIN pubkey ON (pubkey.pubkey_id = prevout.pubkey_id)
-                 WHERE pubkey.pubkey_hash = ?
-                   AND cc.in_longest = 1""", (dbhash,))[0]
-            out = row[0] if row[0] else 0;
-            sent[chain_id] = -out;
-            balance[chain_id] += out;
-            count[1] = row[1];
+            counts = abe.store.get_address_counts(dbhash)
+            chain_id = counts["chain_id"]
+            received[chain_id] = counts["received"]
+            balance[chain_id] = counts["balance"]
+            sent[chain_id] = counts["sent"]
+            count[0] = counts["count_in"]
+            count[1] = counts["count_out"]
+
             # Add chain
             chain = abe.store.get_chain_by_id(chain_id)
             chains.append(chain)

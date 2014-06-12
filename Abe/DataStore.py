@@ -35,7 +35,7 @@ import util
 import logging
 import base58
 
-SCHEMA_VERSION = "Abe37"
+SCHEMA_VERSION = "Abe38-lat1"
 
 CONFIG_DEFAULTS = {
     "dbtype":             None,
@@ -621,6 +621,50 @@ class DataStore(object):
             return "VARCHAR(%d)" % (width,)
 
         return patt.sub(fixup, stmt)
+
+    def get_address_counts(store, dbhash):
+        # Get counts, not transactions
+        result = {}
+
+        row = store.selectall("""
+            SELECT
+                SUM(txout.txout_value),
+                COUNT(*),
+                cc.chain_id
+              FROM chain_candidate cc
+              JOIN block b ON (b.block_id = cc.block_id)
+              JOIN block_tx ON (block_tx.block_id = b.block_id)
+              JOIN tx ON (tx.tx_id = block_tx.tx_id)
+              JOIN txout ON (txout.tx_id = tx.tx_id)
+              JOIN pubkey ON (pubkey.pubkey_id = txout.pubkey_id)
+             WHERE pubkey.pubkey_hash = ?
+               AND cc.in_longest = 1""", (dbhash,))[0]
+
+        result["chain_id"] = row[2]
+        result["received"] = row[0]
+        result["balance"] = row[0]
+        result["count_in"] = row[1]
+
+        row = abe.store.selectall("""
+            SELECT
+                SUM(-prevout.txout_value),
+                COUNT(*)
+              FROM chain_candidate cc
+              JOIN block b ON (b.block_id = cc.block_id)
+              JOIN block_tx ON (block_tx.block_id = b.block_id)
+              JOIN tx ON (tx.tx_id = block_tx.tx_id)
+              JOIN txin ON (txin.tx_id = tx.tx_id)
+              JOIN txout prevout ON (txin.txout_id = prevout.txout_id)
+              JOIN pubkey ON (pubkey.pubkey_id = prevout.pubkey_id)
+             WHERE pubkey.pubkey_hash = ?
+               AND cc.in_longest = 1""", (dbhash,))[0]
+
+        out = row[0] if row[0] else 0
+        result["sent"] = -out
+        result["balance"] += out
+        result["count_out"] = row[1]
+
+        return result
 
     def _approximate_txout(store, fn):
         def ret(stmt):
@@ -2187,6 +2231,13 @@ store._ddl['txout_approx'],
             if pair and pair[1] > ret[chain_id][1]:
                 ret[chain_id] = pair
 
+    def tx_find_id(store, tx):
+        row = store.selectrow("""
+            SELECT tx.tx_id FROM tx
+            WHERE tx_hash = ?
+         """, (store.hashin(tx['hash']),))
+        return row[0]
+
     def tx_find_id_and_value(store, tx, is_coinbase):
         row = store.selectrow("""
             SELECT tx.tx_id, SUM(txout.txout_value), SUM(
@@ -2488,7 +2539,8 @@ store._ddl['txout_approx'],
                 for block_id in to_disconnect:
                     store.disconnect_block(block_id, chain_id)
                 for block_id in to_connect:
-                    store.connect_block(block_id, chain_id)
+                    if block_id != b['block_id']: # to prevent duplicate connect_block
+                        store.connect_block(block_id, chain_id)
 
             elif b['hashPrev'] == GENESIS_HASH_PREV:
                 in_longest = 1  # Assume only one genesis block per chain.  XXX
@@ -2500,6 +2552,8 @@ store._ddl['txout_approx'],
                 chain_id, block_id, in_longest, block_height
             ) VALUES (?, ?, ?, ?)""",
                   (chain_id, b['block_id'], in_longest, b['height']))
+
+        store.connect_txs(b['block_id'])
 
         if in_longest > 0:
             store.sql("""
@@ -2581,12 +2635,90 @@ store._ddl['txout_approx'],
             "SELECT prev_block_id FROM block WHERE block_id = ?",
             (block_id,))[0]
 
+    def get_tracked_adjustments(store, tx_id):
+
+        values = {}
+
+        rows = store.selectall("""
+            SELECT balances.addr_id, SUM(prevout.txout_value) FROM txin
+            JOIN txout prevout ON (txin.txout_id = prevout.txout_id) 
+            JOIN balances ON (prevout.pubkey_id = balances.pubkey_id)
+            WHERE txin.tx_id = ?
+            GROUP BY prevout.pubkey_id
+        """, (tx_id,))
+        
+        for addr_id, out_val in rows:
+            values[addr_id] = out_val
+
+        rows = store.selectall("""
+            SELECT balances.addr_id, SUM(txout.txout_value) FROM txout
+            JOIN balances ON (txout.pubkey_id = balances.pubkey_id)
+            WHERE txout.tx_id = ?
+            GROUP BY txout.pubkey_id
+        """, (tx_id,))
+
+        for addr_id, in_val in rows:
+            values[addr_id] = (values[addr_id] if addr_id in values else 0) + in_val
+
+        return values
+
+    def disconnect_txs(store, block_id):
+        for tx_id, in store.selectall(
+            "SELECT tx_id in block_tx WHERE block_id = ?",
+            (block_id,)):
+
+            # Get the balance adjustments for each watched address, if any
+            
+            values = get_tracked_adjustments(tx_id)
+
+            # Adjust balances
+
+            for addr_id in values:
+                store.sql("""
+                    UPDATE balances
+                    SET balance = balance - ?
+                    WHERE id = ?
+                """, (values[addr_id], addr_id))
+
+                # Delete tx from tracked_txs
+                store.sql("""
+                    DELETE FROM tracked_txs 
+                    WHERE tx_id = ? AND block_id = ? AND addr_id = ?
+                    """, (tx_id, block_id, addr_id))
+
+    def connect_txs(store, block_id):
+
+        for tx_id, in store.selectall(
+            "SELECT tx_id in block_tx WHERE block_id = ?",
+            (block_id,)):
+
+            # Get the balance adjustments for each watched address, if any
+            
+            values = get_tracked_adjustments(tx_id)
+
+            for addr_id in values:
+
+                # Adjust balance
+                store.sql("""
+                    UPDATE balances
+                    SET balance = balance + ?
+                    WHERE id = ?
+                """, (values[addr_id], addr_id))
+
+                # Add transaction to tracked_txs
+
+                store.sql("""
+                    INSET INTO tracked_txs 
+                    VALUES (?, ?, ?, ?, "")
+                """, (addr_id, block_id, tx_id, values[addr_id]))
+
     def disconnect_block(store, block_id, chain_id):
         store.sql("""
             UPDATE chain_candidate
                SET in_longest = 0
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
+        store.disconnect_txs(block_id)
 
     def connect_block(store, block_id, chain_id):
         store.sql("""
@@ -2594,6 +2726,7 @@ store._ddl['txout_approx'],
                SET in_longest = 1
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
+        store.connect_txs(block_id)
 
     def lookup_txout(store, tx_hash, txout_pos):
         row = store.selectrow("""

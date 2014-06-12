@@ -931,6 +931,58 @@ def insert_chain_novacoin(store):
     import Chain
     store.insert_chain(Chain.create("NovaCoin"))
 
+def add_transparency_tables(store):
+    store.ddl("""
+        CREATE TABLE balances (
+            id         TINYINT PRIMARY KEY AUTO INCREMENT,
+            balance    NUMERIC(20),
+            name       VARCHAR(7),
+            pubkey_id  NUMERIC(26),
+            FOREIGN KEY(pubkey_id) REFERENCES pubkey(pubkey_id)
+        )
+    """);
+
+    store.ddl("""
+        CREATE TABLE tracked_txs (
+            addr_id   TINYINT,
+            block_id  NUMERIC(14),
+            tx_id     NUMERIC(26)
+            value     NUMERIC(20),
+            note      TEXT,
+            PRIMARY KEY(addr_id, block_id, tx_id)
+            FOREIGN KEY(addr_id)  REFERENCES balances(id)
+            FOREIGN KEY(block_id) REFERENCES block(block_id)
+            FOREIGN KEY(tx_id)    REFERENCES tx(tx_id),
+        )
+    """);
+
+    initialAddrs = [
+        ["Premine Wallet", "AVtVnLVqQKRLrjUegpCxRLFVXGJBYDww3U"],
+        ["Holding Wallet", "AVB1kxynHkmvGaCemz1hWjY2aGomDVeGdV"],
+        ["Payout Wallet",  "AMXc1icADQEV5V576wD9cqoWo3Pj1N4tZV"],
+        ["Admin Wallet",   "AdeFHiHAvw1ADDPL8FgfPb3DDaTKZuKx1i"],
+    ]
+        
+    for name, addr in initialAddrs:
+
+        version, binaddr = util.decode_check_address(addr)
+        dbhash = store.binin(binaddr)
+
+        addr_id = store.selectrow(
+            "SELECT pubkey_id FROM pubkey WHERE pubkey_hash = ?",
+            (dbhash,)
+        )[0]
+        
+        counts = store.get_address_counts(dbhash)
+
+        store.sql(
+            "INSERT INTO balances VALUES (DEFAULT, ?, ?, ?)",
+            (counts["balance"], name, addr_id)
+        )
+    
+    # Also add detroyed coins
+    store.sql("INSERT INTO balances VALUES (DEFAULT, 0, 'Destroyed Coins', DEFAULT)")
+
 upgrades = [
     ('6',    add_block_value_in),
     ('6.1',  add_block_value_out),
@@ -1021,7 +1073,8 @@ upgrades = [
     ('Abe35.5', drop_magic),             # Fast
     ('Abe36',   add_chain_decimals),     # Fast
     ('Abe36.1', insert_chain_novacoin),  # Fast
-    ('Abe37', None)
+    ('Abe37', None),
+    ('Abe37-lat1', add_transparency_tables)
 ]
 
 def upgrade_schema(store):
