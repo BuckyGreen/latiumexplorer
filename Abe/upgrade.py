@@ -1073,8 +1073,8 @@ upgrades = [
     ('Abe35.5', drop_magic),             # Fast
     ('Abe36',   add_chain_decimals),     # Fast
     ('Abe36.1', insert_chain_novacoin),  # Fast
-    ('Abe37', None),
-    ('Abe37-lat1', add_transparency_tables)
+    ('Abe37',   add_transparency_tables),
+    ('Abe37-lat1', None)
 ]
 
 def upgrade_schema(store):
