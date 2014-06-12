@@ -1098,6 +1098,8 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
             }
 
     def init_latium_changes(store):
+        store.log.info("Initialising Latium changes")
+
         store.ddl("""
             CREATE TABLE balances (
                 id         TINYINT      NOT NULL,
@@ -1153,6 +1155,20 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
         
         # Also add detroyed coins
         store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (addr_id,))
+
+        # Now connect all txs on the main chain
+
+        rows = store.selectall("""
+            SELECT b.block_id
+            FROM block b
+            JOIN chain_candidate cc ON (b.block_id = cc.block_id)
+            WHERE cc.in_longest = 1
+            ORDER BY cc.block_height ASC
+        """, ())
+
+        for block_id, in rows:
+            store.connect_txs(block_id)
+
 
     def initialize(store):
         """
@@ -1383,9 +1399,6 @@ store._ddl['txout_approx'],
 
         store.config['keep_scriptsig'] = \
             "true" if store.args.keep_scriptsig else "false"
-
-        # Initialise Latium changes
-        store.init_latium_changes()
 
         store.save_config()
         store.commit()
@@ -2613,13 +2626,18 @@ store._ddl['txout_approx'],
             ) VALUES (?, ?, ?, ?)""",
                   (chain_id, b['block_id'], in_longest, b['height']))
 
-        store.connect_txs(b['block_id'])
-
         if in_longest > 0:
             store.sql("""
                 UPDATE chain
                    SET chain_last_block_id = ?
                  WHERE chain_id = ?""", (top['block_id'], chain_id))
+
+            store.connect_txs(b['block_id'])
+
+            # Initialise the Latium changes if block height is 13860
+
+            if b['block_height'] == 13860:
+                store.init_latium_changes()
 
         if store.use_firstbits and b['height'] is not None:
             (addr_vers,) = store.selectrow("""

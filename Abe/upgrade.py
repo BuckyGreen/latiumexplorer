@@ -934,19 +934,6 @@ def insert_chain_novacoin(store):
 def add_transparency_tables(store):
     store.init_latium_changes()
 
-    # Now connect all txs on the main chain
-
-    rows = store.selectall("""
-        SELECT b.block_id
-        FROM block b
-        JOIN chain_candidate cc ON (b.block_id = cc.block_id)
-        WHERE cc.in_longest = 1
-        ORDER BY cc.block_height ASC
-    """, ())
-
-    for block_id, in rows:
-        store.connect_txs(block_id)
-
 upgrades = [
     ('6',    add_block_value_in),
     ('6.1',  add_block_value_out),
