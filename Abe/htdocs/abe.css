@@ -4,9 +4,6 @@ html, body{
 .shortlink {
     font-size: smaller;
 }
-th{
-    padding-left: 10px;
-}
 section#main{
     width: 100%;
 }
@@ -40,13 +37,14 @@ section#main{
     left: calc(50% - 100px);
 }
 #navP1, #navP3{
-    width: 40px;
+    width: 60px;
 }
 #navP3{
     right: 0;
 }
 #navP1 a, #navP3 a{
     padding: 0 4px;
+    font-size: 13px;
 }
 strong{
     padding-right: 3px;

@@ -244,6 +244,8 @@ class Abe:
                 # for a response!  XXX Could use threads, timers, or a
                 # cron job.
                 abe.store.catch_up()
+            
+	    page['body'] += abe.search_form(page)
 
             handler(page)
         except PageNotFound:
@@ -354,7 +356,7 @@ class Abe:
                     body += [
                         '<td>', format_time(started)[:10], '</td>',
                         '<td>', '%5g' % (chain_age / 86400.0), '</td>',
-                        '<td>', format_satoshis(satoshis, chain), '</td>',
+                        '<td>', format_satoshis(satoshis, chain, True), '</td>',
                         '<td>', avg_age, '</td>',
                         '<td>', percent_destroyed, '</td>']
 
@@ -392,29 +394,18 @@ class Abe:
             abe.call_handler(page, cmd)
             return
 
-        page['title'] = chain.name
+        row = abe.store.selectrow("""
+            SELECT b.block_height
+            FROM block b
+            JOIN chain c ON (c.chain_last_block_id = b.block_id)
+            WHERE c.chain_id = ?
+        """, (chain.id,))
 
-        body = page['body']
-        body += abe.search_form(page)
-
-        count = get_int_param(page, 'count') or 20
-        hi = get_int_param(page, 'hi')
-        orig_hi = hi
+	max_height = row[0] if row else 0
+        count, hi = abe.get_count_high(page, max_height)
 
         if hi is None:
-            row = abe.store.selectrow("""
-                SELECT b.block_height
-                  FROM block b
-                  JOIN chain c ON (c.chain_last_block_id = b.block_id)
-                 WHERE c.chain_id = ?
-            """, (chain.id,))
-            if row:
-                hi = row[0]
-        if hi is None:
-            if orig_hi is None and count > 0:
-                body += ['<p>I have no blocks in this chain.</p>']
-            else:
-                body += ['<p class="error">'
+            body += ['<p class="error">'
                          'The requested range contains no blocks.</p>\n']
             return
 
@@ -432,56 +423,12 @@ class Abe:
              ORDER BY cc.block_height DESC LIMIT ?
         """, (chain.id, hi - count + 1, hi, count))
 
-        if hi is None:
-            hi = int(rows[0][1])
-        basename = os.path.basename(page['env']['PATH_INFO'])
+        columns = [[None, 'Block'], [None, 'Approx. Time'], [None, 'Transactions'], [None, 'Value Out'],
+                 [None, 'Difficulty'], [None, 'Outstanding'], [None, 'Average Age'], [None, 'Chain Age'],
+                 [None, '% <a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">CoinDD</a>']]
 
-        nav = ['<div id="nav"><p id="navP1"><a href="',
-               basename, '?count=', str(count), '">&lt;&lt;</a>']
-        nav += [' <a href="', basename, '?hi=', str(hi + count),
-                 '&amp;count=', str(count), '">&lt;</a></p><p id="navP2">']
-                 
-        for c in (20, 50, 100, 500, 1000):
-            nav += [' ']
-            if c != count:
-                nav += ['<a href="', basename, '?count=', str(c)]
-                if hi is not None:
-                    nav += ['&amp;hi=', str(max(hi, c - 1))]
-                nav += ['">']
-            nav += [' ', str(c)]
-            if c != count:
-                nav += ['</a>']
+        table_rows = []
 
-        nav += ['</p><p id="navP3">']         
-                 
-        nav += [' ', '&gt;']
-        if hi >= count:
-            nav[-1] = ['<a href="', basename, '?hi=', str(hi - count),
-                        '&amp;count=', str(count), '">', nav[-1], '</a>']
-        nav += [' ', '&gt;&gt;']
-        if hi != count - 1:
-            nav[-1] = ['<a href="', basename, '?hi=', str(count - 1),
-                        '&amp;count=', str(count), '">', nav[-1], '</a>']
-        nav += ['</p></div>']
-        
-        extra = False
-        #extra = True
-        body += [
-                 '<article class="module width_full">'
-                 '<header><h3>BLOCKS</h3></header>'
-                 , nav, '\n',
-                 '<table class="tablesorter" cellspacing="0"><thead>'
-                 '<tr><th>Block</th><th>Approx. Time</th>',
-                 '<th>Transactions</th><th>Value Out</th>',
-                 '<th>Difficulty</th><th>Outstanding</th>',
-                 '<th>Average Age</th><th>Chain Age</th>',
-                 '<th>% ',
-                 '<a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">',
-                 'CoinDD</a></th>',
-                 ['<th>Satoshi-seconds</th>',
-                  '<th>Total ss</th>']
-                 if extra else '',
-                 '</tr></thead>\n']
         for row in rows:
             (hash, height, nTime, num_tx, nBits, value_out,
              seconds, ss, satoshis, destroyed, total_ss) = row
@@ -502,23 +449,21 @@ class Abe:
             else:
                 percent_destroyed = '%5g%%' % (100.0 - (100.0 * ss / total_ss))
 
-            body += [
-                '<tr><td><a href="', page['dotdot'], 'block/',
-                abe.store.hashout_hex(hash),
-                '">', height, '</a>'
-                '</td><td>', format_time(int(nTime)),
-                '</td><td>', num_tx,
-                '</td><td>', format_satoshis(value_out, chain),
-                '</td><td>', util.calculate_difficulty(int(nBits)),
-                '</td><td>', format_satoshis(satoshis, chain),
-                '</td><td>', avg_age,
-                '</td><td>', '%5g' % (seconds / 86400.0),
-                '</td><td>', percent_destroyed,
-                ['</td><td>', '%8g' % ss,
-                 '</td><td>', '%8g' % total_ss] if extra else '',
-                '</td></tr>\n']
+            table_rows.append([
+                '<a href="' + page['dotdot'] + 'block/' +
+                abe.store.hashout_hex(hash) +
+                '">' + str(height) + '</a>',
+                format_time(int(nTime)),
+                num_tx,
+                format_satoshis(value_out, chain, True),
+                util.calculate_difficulty(int(nBits)),
+                format_satoshis(satoshis, chain, True),
+                avg_age,
+                '%5g' % (seconds / 86400.0),
+                percent_destroyed,
+            ])
 
-        body += ['</table>\n', nav, '</article>\n']
+        abe.create_nav_table(page, "Blocks", count, max_height, hi, columns, table_rows) 
 
     def _show_block(abe, where, bind, page, dotdotblock, chain):
         address_version = ('\0' if chain is None
@@ -666,12 +611,12 @@ class Abe:
                           escape(chain.name), '?hi=', height, '">',
                           escape(chain.name), '</a> ', height]
 
-        body += ['<article class="module width_3_quarter center3Quart"><header><h3>BLOCK INFORMATION</h3></header><div class="module_content">']
+        body += ['<article class="module width_3_quarter center3Quart"><header><h3>BLOCK INFORMATION</h3></header><div class="module_content"><strong>']
         if is_stake_chain:
             body += [
                 'Proof of Stake' if is_proof_of_stake else 'Proof of Work',
-                ': ',
-                format_satoshis(generated, chain), ' coins generated<br />\n']
+                ':</strong> ',
+                format_satoshis(generated, chain, True), ' coins generated<br />\n']
         body += ['<strong>Hash:</strong> ', block_hash, '<br />\n']
 
         if prev_block_hash is not None:
@@ -694,8 +639,8 @@ class Abe:
 
             '<br /><strong>Nonce:</strong> ', nNonce, '<br />\n',
             '<strong>Transactions:</strong> ', num_tx, '<br />\n',
-            '<strong>Value out:</strong> ', format_satoshis(value_out, chain), '<br />\n',
-            '<strong>Transaction Fees:</strong> ', format_satoshis(block_fees, chain), '<br />\n',
+            '<strong>Value out:</strong> ', format_satoshis(value_out, chain, True), '<br />\n',
+            '<strong>Transaction Fees:</strong> ', format_satoshis(block_fees, chain, True), '<br />\n',
 
             ['<strong>Average Coin Age:</strong> %6g' % (ss / 86400.0 / satoshis,),
              ' days<br />\n']
@@ -703,7 +648,7 @@ class Abe:
 
             '' if destroyed is None else
             ['<strong>Coin-days Destroyed:</strong> ',
-             format_satoshis(destroyed / 86400.0, chain), '<br />\n'],
+             format_satoshis(destroyed / 86400.0, chain, True), '<br />\n'],
 
             ['<strong>Cumulative Coin-days Destroyed:</strong> %6g%%<br />\n' %
              (100 * (1 - float(ss) / total_ss),)]
@@ -724,20 +669,20 @@ class Abe:
             tx = txs[tx_id]
             body += ['<tr><td><a href="../tx/' + tx['hash'] + '">',
                      tx['hash'][:10], '...</a>'
-                     '</td><td>', format_satoshis(tx['fees'], chain),
+                     '</td><td>', format_satoshis(tx['fees'], chain, True),
                      '</td><td>', tx['size'] / 1000.0,
                      '</td><td>']
             if tx is coinbase_tx:
                 body += [
                     'POS ' if is_proof_of_stake else '',
-                    'Generation: ', format_satoshis(generated, chain), ' + ',
-                    format_satoshis(block_fees, chain), ' total fees']
+                    'Generation: ', format_satoshis(generated, chain, True), ' + ',
+                    format_satoshis(block_fees, chain, True), ' total fees']
             else:
                 for txin in tx['in']:
                     body += hash_to_address_link(
                         address_version, txin['pubkey_hash'], page['dotdot'])
                     body += [
-                        ': ', format_satoshis(txin['value'], chain), '<br />']
+                        ': ', format_satoshis(txin['value'], chain, True), '<br />']
             body += ['</td><td>']
             for txout in tx['out']:
                 if is_proof_of_stake:
@@ -745,7 +690,7 @@ class Abe:
                         assert txout['value'] == 0
                         assert len(tx['out']) == 1
                         body += [
-                            format_satoshis(posgen, chain),
+                            format_satoshis(posgen, chain, True),
                             ' included in the following transaction']
                         continue
                     if txout['value'] == 0:
@@ -753,7 +698,7 @@ class Abe:
 
                 body += hash_to_address_link(
                     address_version, txout['pubkey_hash'], page['dotdot'])
-                body += [': ', format_satoshis(txout['value'], chain), '<br />']
+                body += [': ', format_satoshis(txout['value'], chain, True), '<br />']
             body += ['</td></tr>\n']
         body += '</table></article>\n'
 
@@ -852,7 +797,7 @@ class Abe:
                     '">', row['o_hash'][:10], '...:', row['o_pos'], '</a>']
             body += [
                 '</td>\n',
-                '<td>', format_satoshis(row['value'], chain), '</td>\n',
+                '<td>', format_satoshis(row['value'], chain, True), '</td>\n',
                 '<td>']
             if row['binaddr'] is None:
                 body += ['Unknown']
@@ -939,14 +884,14 @@ class Abe:
         body += [
             '<strong>Number of inputs:</strong> ', len(in_rows),
             ' (<a href="#inputs">Jump to inputs</a>)<br />\n',
-            '<strong>Total in:</strong> ', format_satoshis(value_in, chain), '<br />\n',
+            '<strong>Total in:</strong> ', format_satoshis(value_in, chain, True), '<br />\n',
             '<strong>Number of outputs:</strong> ', len(out_rows),
             ' (<a href="#outputs">Jump to outputs</a>)<br />\n',
-            '<strong>Total out:</strong> ', format_satoshis(value_out, chain), '<br />\n',
+            '<strong>Total out:</strong> ', format_satoshis(value_out, chain, True), '<br />\n',
             '<strong>Size:</strong> ', tx_size, ' bytes<br />\n',
             '<strong>Fee:</strong> ', format_satoshis(0 if is_coinbase else
                                      (value_in and value_out and
-                                      value_in - value_out), chain),
+                                      value_in - value_out), chain, True),
             '<br />\n',
             '<a href="../rawtx/', tx_hash, '"><strong>Raw transaction</strong></a><br />\n']
         body += ['</div></article>\n',
@@ -1115,7 +1060,7 @@ class Abe:
             for chain in chains:
                 if ret:
                     ret += [', ']
-                ret += [format_satoshis(amounts[chain_id], chain),
+                ret += [format_satoshis(amounts[chain_id], chain, True),
                         ' ', escape(chain.code3)]
                 if link:
                     other = util.hash_to_address(
@@ -1170,11 +1115,11 @@ class Abe:
                          '">', elt['height'], '</a></td><td>',
                          format_time(elt['nTime']), '</td><td>']
                 if elt['value'] < 0:
-                    body += ['<span class="negativeValue">-', format_satoshis(-elt['value'], chain), '</span>']
+                    body += ['<span class="negativeValue">-', format_satoshis(-elt['value'], chain, True), '</span>']
                 else:
-                    body += [format_satoshis(elt['value'], chain)]
+                    body += [format_satoshis(elt['value'], chain, True)]
                 body += ['</td><td>',
-                         format_satoshis(balance[elt['chain_id']], chain),
+                         format_satoshis(balance[elt['chain_id']], chain, True),
                          '</td>',
                          '</tr>\n']
         body += ['</table></article>\n']
@@ -1182,7 +1127,7 @@ class Abe:
     def search_form(abe, page):
         q = (page['params'].get('q') or [''])[0]
         return [
-            '<article class="module width_half centerHalf">'
+            '<article id="search" class="module width_half centerHalf">'
             '<header><h3>SEARCH</h3></header>'
             '<div class="module_content">'
             '<form action="', page['dotdot'], 'search">\n'
@@ -1594,6 +1539,129 @@ class Abe:
         page['template'] = '%(body)s'
         page['body'] = func(page, page['chain'])
 
+    def create_nav_table(abe, page, title, count, max_height, hi, columns, rows):
+        page['title'] = title
+        body = page['body']
+
+        basename = os.path.basename(page['env']['PATH_INFO'])
+
+        nav = ['<div id="nav"><p id="navP1">']
+	if max_height > hi:
+	    nav += ['<a href="',
+               basename, '?count=', str(count), '">&#9668;&#9668;</a>']
+            nav += [' <a href="', basename, '?hi=', str(min(max_height, hi + count)),
+                 '&amp;count=', str(count), '">&#9668;<lt;</a>']
+        nav += ['</p><p id="navP2">']
+                 
+        for c in (20, 50, 100, 500, 1000):
+            nav += [' ']
+            if c != count:
+                print "HERE"
+                nav += ['<a href="', basename, '?count=', str(c)]
+                if hi is not None:
+                    nav += ['&amp;hi=', str(hi)]
+                nav += ['">']
+            nav += [' ', str(c)]
+            if c != count:
+                nav += ['</a>']
+
+        nav += ['</p><p id="navP3">']         
+                 
+        if hi >= count:
+            nav += ['<a href="', basename, '?hi=', str(hi - count),
+                        '&amp;count=', str(count), '"> &#9658;</a>']
+            nav += ['<a href="', basename, '?hi=', str(count - 1),
+                        '&amp;count=', str(count), '"> &#9658;&#9658;</a>']
+
+        nav += ['</p></div>']
+        
+        body += [
+                 '<article class="module width_full">'
+                 '<header><h3>', title, '</h3></header>'
+                 , nav, '\n',
+                 '<table class="tablesorter" cellspacing="0"><thead>'
+                 '<tr>']
+        
+        for column in columns:
+            body += ['<th>' if column[0] is None else '<th style="width: ' + column[0] + ';">', column[1], '</th>']
+
+        body += ['</tr></thead>\n']
+
+        for row in rows:
+            body += ['<tr>']
+
+            for cell in row:
+                body += ['<td>', cell, '</td>']
+
+        body += ['</table>\n', nav, '</article>\n']
+
+    def get_count_high(abe, page, maxhi):
+
+        count = get_int_param(page, 'count') or 20
+        hi = get_int_param(page, 'hi')
+
+        if hi is not None:
+            hi = hi - (hi % count) + count - 1
+
+        if hi is None or hi > maxhi:
+            hi = maxhi
+
+        return (count, hi)
+
+    def handle_wallets(abe, page):
+        wallet = wsgiref.util.shift_path_info(page['env'])
+
+        if wallet is None:
+            return PageNotFound()
+
+        try:
+            wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
+        except KeyError:
+            return PageNotFound()
+
+        chain = abe.chain_lookup_by_name("Latium")
+
+        max_order_id = abe.store.get_last_order_id(wallet_id)
+        count, hi = abe.get_count_high(page, max_order_id)
+        
+        columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40%", "Notes"]]
+
+        rows = abe.store.selectall("""
+            SELECT tx.tx_hash, b.block_hash, b.block_height, b.block_nTime, trc.value, trc.note
+            FROM tracked_txs trc
+            JOIN tx ON (trc.tx_id = tx.tx_id)
+            JOIN block b ON (trc.block_id = b.block_id)
+            JOIN chain_candidate cc ON (b.block_id = cc.block_id)
+            WHERE cc.in_longest = 1
+            AND trc.addr_id = ?
+            AND trc.tx_order BETWEEN ? AND ?
+            ORDER BY trc.tx_order DESC LIMIT ?
+        """, (wallet_id, hi - count + 2, hi + 1, count))
+
+        table_rows = []
+
+        for tx_hash, block_hash, block_height, block_time, value, notes in rows:
+            val_text = '<span class="negativeValue">' if value < 0 else ''
+            val_text += format_satoshis(value, chain, True)
+            if value < 0:
+                val_text += '</span>'
+
+            table_rows.append([
+                '<a href="' + page['dotdot'] + 'tx/' +
+                tx_hash +
+                '">' + tx_hash[:20] + '...</a>',
+                '<a href="' + page['dotdot'] + 'block/' +
+                block_hash +
+                '">' + str(block_height) + '</a>',
+                format_time(int(block_time)),
+                val_text,
+                notes
+            ])
+
+        balance = abe.store.selectrow("SELECT balance FROM balances WHERE id = ?", (wallet_id,))[0]
+
+        abe.create_nav_table(page, wallet + " Wallet (Balance: " + format_satoshis(balance, chain, True) + ")", count, max_order_id, hi, columns, table_rows)
+
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
         if cmd is None:
@@ -1885,8 +1953,18 @@ class Abe:
             page['content_type'] = 'image/svg+xml'
             return ret
 
+    def gettotalsatoshis(abe, chain):
+        row = abe.store.selectrow("""
+            SELECT b.block_total_satoshis
+              FROM chain c
+              LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
+             WHERE c.chain_id = ?
+        """, (chain.id,))
+        return row[0] if row else 0
+
     def q_totalbc(abe, page, chain):
         """shows the amount of currency ever mined."""
+
         if chain is None:
             return 'Shows the amount of currency ever mined.\n' \
                 'This differs from the amount in circulation when' \
@@ -1895,14 +1973,11 @@ class Abe:
                 ' support future block numbers, and it returns a sum of' \
                 ' observed generations rather than a calculated value.\n' \
                 '/chain/CHAIN/q/totalbc[/HEIGHT]\n'
+
         height = path_info_uint(page, None)
+
         if height is None:
-            row = abe.store.selectrow("""
-                SELECT b.block_total_satoshis
-                  FROM chain c
-                  LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
-                 WHERE c.chain_id = ?
-            """, (chain.id,))
+            satoshis = abe.gettotalsatoshis(chain)
         else:
             row = abe.store.selectrow("""
                 SELECT b.block_total_satoshis
@@ -1914,7 +1989,18 @@ class Abe:
             """, (chain.id, height))
             if not row:
                 return 'ERROR: block %d not seen yet' % (height,)
-        return format_satoshis(row[0], chain) if row else 0
+            satoshis = row[0]
+
+        return format_satoshis(satoshis, chain)
+
+    def q_circulation(abe, page, chain):
+        """Total amount of Latium in circulation"""
+
+        if chain is None:
+            return "Please specifiy the Latium chain: /chain/Latium/q/circulation"
+
+        row = abe.store.selectrow("SELECT SUM(balance) FROM balances", ())
+        return format_satoshis(abe.gettotalsatoshis(chain) - row[0], chain)
 
     def q_getreceivedbyaddress(abe, page, chain):
         """shows the amount ever received by a given address."""
@@ -2105,18 +2191,19 @@ def format_time(nTime):
     import time
     return time.strftime('%d %b %Y, %H:%M:%S', time.gmtime(int(nTime)))
 
-def format_satoshis(satoshis, chain):
+def format_satoshis(satoshis, chain, commas=False):
     decimals = DEFAULT_DECIMALS if chain.decimals is None else chain.decimals
     coin = 10 ** decimals
 
     if satoshis is None:
         return ''
     if satoshis < 0:
-        return '-' + format_satoshis(-satoshis, chain)
+        return '-' + format_satoshis(-satoshis, chain, commas)
+
     satoshis = int(satoshis)
     integer = satoshis / coin
     frac = satoshis % coin
-    return (str(integer) +
+    return (("{:" + "," * commas + "}").format(integer) +
             ('.' + (('0' * decimals) + str(frac))[-decimals:])
             .rstrip('0').rstrip('.'))
 

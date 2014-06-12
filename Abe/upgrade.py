@@ -932,74 +932,8 @@ def insert_chain_novacoin(store):
     store.insert_chain(Chain.create("NovaCoin"))
 
 def add_transparency_tables(store):
-    store.ddl("""
-        CREATE TABLE balances (
-            id         TINYINT      NOT NULL,
-            balance    NUMERIC(20)  NOT NULL,
-            name       VARCHAR(7)   NOT NULL,
-            pubkey_id  NUMERIC(26)  NULL,
-            PRIMARY KEY(id),
-            FOREIGN KEY(pubkey_id) REFERENCES pubkey(pubkey_id)
-        )
-    """);
-
-    store.ddl("""
-        CREATE TABLE tracked_txs (
-            addr_id   TINYINT     NOT NULL,
-            block_id  NUMERIC(14) NOT NULL,
-            tx_id     NUMERIC(26) NOT NULL,
-            value     NUMERIC(20) NOT NULL,
-            note      TEXT        NULL,
-            PRIMARY KEY(addr_id, block_id, tx_id),
-            FOREIGN KEY(addr_id)  REFERENCES balances(id),
-            FOREIGN KEY(block_id) REFERENCES block(block_id),
-            FOREIGN KEY(tx_id)    REFERENCES tx(tx_id)
-        )
-    """);
-
-    initialAddrs = [
-        ["Premine Wallet", "AVtVnLVqQKRLrjUegpCxRLFVXGJBYDww3U"],
-        ["Holding Wallet", "AVB1kxynHkmvGaCemz1hWjY2aGomDVeGdV"],
-        ["Payout Wallet",  "AMXc1icADQEV5V576wD9cqoWo3Pj1N4tZV"],
-        ["Admin Wallet",   "AdeFHiHAvw1ADDPL8FgfPb3DDaTKZuKx1i"],
-    ]
-        
-    addr_id = 0
-
-    for name, addr in initialAddrs:
-
-        version, binaddr = util.decode_check_address(addr)
-        dbhash = store.binin(binaddr)
-
-        addr_id, = store.selectrow(
-            "SELECT pubkey_id FROM pubkey WHERE pubkey_hash = ?",
-            (dbhash,)
-        )
-        
-        counts = store.get_address_counts(dbhash)
-
-        store.sql(
-            "INSERT INTO balances VALUES (?, ?, ?, ?)",
-            (addr_id, counts["balance"], name, addr_id)
-        )
-
-        addr_id += 1
-    
-    # Also add detroyed coins
-    store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (addr_id,))
-
-    # Now connect all txs on the main chain
-
-    rows = store.selectall("""
-        SELECT b.block_id
-        FROM block b
-        JOIN chain_candidate cc ON (b.block_id = cc.block_id)
-        WHERE cc.in_longest = 1
-        ORDER BY cc.block_height ASC
-    """, ())
-
-    for block_id, in rows:
-        store.connect_txs(block_id)
+    if store.ready_for_latium_changes():
+        store.init_latium_changes()
 
 upgrades = [
     ('6',    add_block_value_in),
@@ -1092,7 +1026,7 @@ upgrades = [
     ('Abe36',   add_chain_decimals),     # Fast
     ('Abe36.1', insert_chain_novacoin),  # Fast
     ('Abe37',   add_transparency_tables),
-    ('Abe37-lat1', None)
+    ('Abe37.1', None)
 ]
 
 def upgrade_schema(store):

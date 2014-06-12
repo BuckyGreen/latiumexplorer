@@ -37,6 +37,8 @@ import base58
 
 SCHEMA_VERSION = "Abe38-lat1"
 
+LATIUM_CHANGES_BLOCK = "c8ce9daa9588a9adf2cac97faa8cad4d78a08f53acce01061c28d006d35bbc68"
+
 CONFIG_DEFAULTS = {
     "dbtype":             None,
     "connect_args":       None,
@@ -194,6 +196,9 @@ class DataStore(object):
 
         if args.rescan:
             store.sql("UPDATE datadir SET blkfile_number=1, blkfile_offset=0")
+
+        # See if Latium changes have been made to the database
+        store.updated_for_latium = store.selectrow("SHOW TABLES LIKE 'tracked_txs'") != None
 
         store._init_datadirs()
         store._init_chains()
@@ -645,7 +650,7 @@ class DataStore(object):
         result["balance"] = row[0]
         result["count_in"] = row[1]
 
-        row = abe.store.selectall("""
+        row = store.selectall("""
             SELECT
                 SUM(-prevout.txout_value),
                 COUNT(*)
@@ -1096,6 +1101,94 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
     nextid NUMERIC(30)
 )""",
             }
+
+    def ready_for_latium_changes(store):
+        # Check for the hash of the block where all wallet addresses are on the chain
+        dbhash = store.hashin_hex(LATIUM_CHANGES_BLOCK)
+
+        row = store.selectrow("""
+            SELECT 1
+              FROM block
+             WHERE block_hash = ? 
+        """, (dbhash,))
+
+        return row != None
+
+    def init_latium_changes(store):
+        store.log.info("Initialising Latium changes")
+
+        store.ddl("""
+            CREATE TABLE balances (
+                id         TINYINT      NOT NULL,
+                balance    NUMERIC(20)  NOT NULL,
+                name       VARCHAR(15)  NOT NULL,
+                pubkey_id  NUMERIC(26)  NULL,
+                PRIMARY KEY(id),
+                FOREIGN KEY(pubkey_id) REFERENCES pubkey(pubkey_id)
+            )
+        """);
+
+        store.ddl("""
+            CREATE TABLE tracked_txs (
+                tx_order  BIGINT      NOT NULL,
+                addr_id   TINYINT     NOT NULL,
+                block_id  NUMERIC(14) NOT NULL,
+                tx_id     NUMERIC(26) NOT NULL,
+                value     NUMERIC(20) NOT NULL,
+                note      TEXT        NULL,
+                PRIMARY KEY(tx_order, addr_id),
+                FOREIGN KEY(addr_id)  REFERENCES balances(id),
+                FOREIGN KEY(block_id) REFERENCES block(block_id),
+                FOREIGN KEY(tx_id)    REFERENCES tx(tx_id)
+            )
+        """);
+
+        initialAddrs = [
+            ["Premine Wallet", "AVtVnLVqQKRLrjUegpCxRLFVXGJBYDww3U"],
+            ["Holding Wallet", "AVB1kxynHkmvGaCemz1hWjY2aGomDVeGdV"],
+            ["Payout Wallet",  "AMXc1icADQEV5V576wD9cqoWo3Pj1N4tZV"],
+            ["Admin Wallet",   "AdeFHiHAvw1ADDPL8FgfPb3DDaTKZuKx1i"],
+        ]
+            
+        wallet_addr_id = 0
+
+        for name, addr in initialAddrs:
+
+            version, binaddr = util.decode_check_address(addr)
+            dbhash = store.binin(binaddr)
+
+            addr_id, = store.selectrow(
+                "SELECT pubkey_id FROM pubkey WHERE pubkey_hash = ?",
+                (dbhash,)
+            )
+            
+            counts = store.get_address_counts(dbhash)
+
+            store.sql(
+                "INSERT INTO balances VALUES (?, ?, ?, ?)",
+                (wallet_addr_id, counts["balance"], name, addr_id)
+            )
+
+            wallet_addr_id += 1
+        
+        # Also add detroyed coins
+        store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (wallet_addr_id,))
+
+        # Now connect all txs on the main chain
+
+        rows = store.selectall("""
+            SELECT b.block_id
+            FROM block b
+            JOIN chain_candidate cc ON (b.block_id = cc.block_id)
+            WHERE cc.in_longest = 1
+            ORDER BY cc.block_height ASC
+        """, ())
+
+        for block_id, in rows:
+            store.connect_txs(block_id, True)
+
+        store.updated_for_latium = True
+
 
     def initialize(store):
         """
@@ -2494,6 +2587,7 @@ store._ddl['txout_approx'],
             store._offer_block_to_chain(b, chain_id)
 
     def _offer_block_to_chain(store, b, chain_id):
+
         if b['chain_work'] is None:
             in_longest = 0
         else:
@@ -2553,13 +2647,18 @@ store._ddl['txout_approx'],
             ) VALUES (?, ?, ?, ?)""",
                   (chain_id, b['block_id'], in_longest, b['height']))
 
-        store.connect_txs(b['block_id'])
-
         if in_longest > 0:
             store.sql("""
                 UPDATE chain
                    SET chain_last_block_id = ?
                  WHERE chain_id = ?""", (top['block_id'], chain_id))
+
+            if store.updated_for_latium:
+                store.connect_txs(b['block_id'])
+            else:
+                # Initialise the Latium changes if block hash is c8ce9daa9588a9adf2cac97faa8cad4d78a08f53acce01061c28d006d35bbc68
+                if b['height'] == 13845 and store.ready_for_latium_changes(): 
+                    store.init_latium_changes()
 
         if store.use_firstbits and b['height'] is not None:
             (addr_vers,) = store.selectrow("""
@@ -2640,7 +2739,7 @@ store._ddl['txout_approx'],
         values = {}
 
         rows = store.selectall("""
-            SELECT balances.addr_id, SUM(prevout.txout_value) FROM txin
+            SELECT balances.id, SUM(prevout.txout_value) FROM txin
             JOIN txout prevout ON (txin.txout_id = prevout.txout_id) 
             JOIN balances ON (prevout.pubkey_id = balances.pubkey_id)
             WHERE txin.tx_id = ?
@@ -2648,10 +2747,10 @@ store._ddl['txout_approx'],
         """, (tx_id,))
         
         for addr_id, out_val in rows:
-            values[addr_id] = out_val
+            values[addr_id] = -out_val
 
         rows = store.selectall("""
-            SELECT balances.addr_id, SUM(txout.txout_value) FROM txout
+            SELECT balances.id, SUM(txout.txout_value) FROM txout
             JOIN balances ON (txout.pubkey_id = balances.pubkey_id)
             WHERE txout.tx_id = ?
             GROUP BY txout.pubkey_id
@@ -2664,12 +2763,12 @@ store._ddl['txout_approx'],
 
     def disconnect_txs(store, block_id):
         for tx_id, in store.selectall(
-            "SELECT tx_id in block_tx WHERE block_id = ?",
+            "SELECT tx_id FROM block_tx WHERE block_id = ?",
             (block_id,)):
 
             # Get the balance adjustments for each watched address, if any
             
-            values = get_tracked_adjustments(tx_id)
+            values = store.get_tracked_adjustments(tx_id)
 
             # Adjust balances
 
@@ -2680,37 +2779,51 @@ store._ddl['txout_approx'],
                     WHERE id = ?
                 """, (values[addr_id], addr_id))
 
-                # Delete tx from tracked_txs
-                store.sql("""
-                    DELETE FROM tracked_txs 
-                    WHERE tx_id = ? AND block_id = ? AND addr_id = ?
-                    """, (tx_id, block_id, addr_id))
+            # Delete tx from tracked_txs
+            store.sql("""
+                DELETE FROM tracked_txs 
+                WHERE block_id = ? 
+                """, (tx_id))
 
-    def connect_txs(store, block_id):
+    def get_last_order_id(store, addr_id):
+        row = store.selectrow("""
+            SELECT tx_order
+            FROM tracked_txs
+            WHERE addr_id = ?
+            ORDER BY tx_order DESC LIMIT 1
+        """, (addr_id,))
+        return 0 if row is None else row[0]
+
+    def connect_txs(store, block_id, txs_only=False):
 
         for tx_id, in store.selectall(
-            "SELECT tx_id in block_tx WHERE block_id = ?",
+            "SELECT tx_id FROM block_tx WHERE block_id = ?",
             (block_id,)):
 
             # Get the balance adjustments for each watched address, if any
             
-            values = get_tracked_adjustments(tx_id)
+            values = store.get_tracked_adjustments(tx_id)
 
             for addr_id in values:
 
-                # Adjust balance
-                store.sql("""
-                    UPDATE balances
-                    SET balance = balance + ?
-                    WHERE id = ?
-                """, (values[addr_id], addr_id))
+                if not txs_only:
+                    # Adjust balance
+                    store.sql("""
+                        UPDATE balances
+                        SET balance = balance + ?
+                        WHERE id = ?
+                    """, (values[addr_id], addr_id))
+
+                # Get the next transaction order id
+
+                tx_order = store.get_last_order_id(addr_id) + 1
 
                 # Add transaction to tracked_txs
 
                 store.sql("""
-                    INSET INTO tracked_txs 
-                    VALUES (?, ?, ?, ?, "")
-                """, (addr_id, block_id, tx_id, values[addr_id]))
+                    INSERT INTO tracked_txs 
+                    VALUES (?, ?, ?, ?, ?, "")
+                """, (tx_order, addr_id, block_id, tx_id, values[addr_id]))
 
     def disconnect_block(store, block_id, chain_id):
         store.sql("""
@@ -2718,7 +2831,9 @@ store._ddl['txout_approx'],
                SET in_longest = 0
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
-        store.disconnect_txs(block_id)
+
+        if store.updated_for_latium:
+            store.disconnect_txs(block_id)
 
     def connect_block(store, block_id, chain_id):
         store.sql("""
@@ -2726,7 +2841,9 @@ store._ddl['txout_approx'],
                SET in_longest = 1
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
-        store.connect_txs(block_id)
+
+        if store.updated_for_latium:
+            store.connect_txs(block_id)
 
     def lookup_txout(store, tx_hash, txout_pos):
         row = store.selectrow("""
