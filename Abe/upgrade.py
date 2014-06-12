@@ -934,25 +934,26 @@ def insert_chain_novacoin(store):
 def add_transparency_tables(store):
     store.ddl("""
         CREATE TABLE balances (
-            id         TINYINT PRIMARY KEY AUTO INCREMENT,
-            balance    NUMERIC(20),
-            name       VARCHAR(7),
-            pubkey_id  NUMERIC(26),
+            id         TINYINT      NOT NULL AUTO INCREMENT,
+            balance    NUMERIC(20)  NOT NULL,
+            name       VARCHAR(7)   NOT NULL,
+            pubkey_id  NUMERIC(26)  NULL,
+            PRIMARY KEY(id),
             FOREIGN KEY(pubkey_id) REFERENCES pubkey(pubkey_id)
         )
     """);
 
     store.ddl("""
         CREATE TABLE tracked_txs (
-            addr_id   TINYINT,
-            block_id  NUMERIC(14),
-            tx_id     NUMERIC(26)
-            value     NUMERIC(20),
-            note      TEXT,
-            PRIMARY KEY(addr_id, block_id, tx_id)
-            FOREIGN KEY(addr_id)  REFERENCES balances(id)
-            FOREIGN KEY(block_id) REFERENCES block(block_id)
-            FOREIGN KEY(tx_id)    REFERENCES tx(tx_id),
+            addr_id   TINYINT     NOT NULL,
+            block_id  NUMERIC(14) NOT NULL,
+            tx_id     NUMERIC(26) NOT NULL,
+            value     NUMERIC(20) NOT NULL,
+            note      TEXT        NULL,
+            PRIMARY KEY(addr_id, block_id, tx_id),
+            FOREIGN KEY(addr_id)  REFERENCES balances(id),
+            FOREIGN KEY(block_id) REFERENCES block(block_id),
+            FOREIGN KEY(tx_id)    REFERENCES tx(tx_id)
         )
     """);
 
