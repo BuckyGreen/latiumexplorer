@@ -971,10 +971,10 @@ def add_transparency_tables(store):
         version, binaddr = util.decode_check_address(addr)
         dbhash = store.binin(binaddr)
 
-        addr_id = store.selectrow(
+        addr_id, = store.selectrow(
             "SELECT pubkey_id FROM pubkey WHERE pubkey_hash = ?",
             (dbhash,)
-        )[0]
+        )
         
         counts = store.get_address_counts(dbhash)
 
@@ -987,6 +987,19 @@ def add_transparency_tables(store):
     
     # Also add detroyed coins
     store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (addr_id,))
+
+    # Now connect all txs on the main chain
+
+    rows = store.selectall("""
+        SELECT b.block_id
+        FROM block b
+        JOIN chain_candidate cc ON (b.block_id = cc.block_id)
+        WHERE cc.in_longest = 1
+        ORDER BY cc.block_height ASC
+    """, ())
+
+    for block_id, in rows:
+        store.connect_txs(block_id)
 
 upgrades = [
     ('6',    add_block_value_in),
