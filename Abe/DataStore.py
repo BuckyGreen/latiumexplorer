@@ -1097,6 +1097,63 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
 )""",
             }
 
+    def init_latium_changes(store):
+        store.ddl("""
+            CREATE TABLE balances (
+                id         TINYINT      NOT NULL,
+                balance    NUMERIC(20)  NOT NULL,
+                name       VARCHAR(7)   NOT NULL,
+                pubkey_id  NUMERIC(26)  NULL,
+                PRIMARY KEY(id),
+                FOREIGN KEY(pubkey_id) REFERENCES pubkey(pubkey_id)
+            )
+        """);
+
+        store.ddl("""
+            CREATE TABLE tracked_txs (
+                addr_id   TINYINT     NOT NULL,
+                block_id  NUMERIC(14) NOT NULL,
+                tx_id     NUMERIC(26) NOT NULL,
+                value     NUMERIC(20) NOT NULL,
+                note      TEXT        NULL,
+                PRIMARY KEY(addr_id, block_id, tx_id),
+                FOREIGN KEY(addr_id)  REFERENCES balances(id),
+                FOREIGN KEY(block_id) REFERENCES block(block_id),
+                FOREIGN KEY(tx_id)    REFERENCES tx(tx_id)
+            )
+        """);
+
+        initialAddrs = [
+            ["Premine Wallet", "AVtVnLVqQKRLrjUegpCxRLFVXGJBYDww3U"],
+            ["Holding Wallet", "AVB1kxynHkmvGaCemz1hWjY2aGomDVeGdV"],
+            ["Payout Wallet",  "AMXc1icADQEV5V576wD9cqoWo3Pj1N4tZV"],
+            ["Admin Wallet",   "AdeFHiHAvw1ADDPL8FgfPb3DDaTKZuKx1i"],
+        ]
+            
+        addr_id = 0
+
+        for name, addr in initialAddrs:
+
+            version, binaddr = util.decode_check_address(addr)
+            dbhash = store.binin(binaddr)
+
+            addr_id, = store.selectrow(
+                "SELECT pubkey_id FROM pubkey WHERE pubkey_hash = ?",
+                (dbhash,)
+            )
+            
+            counts = store.get_address_counts(dbhash)
+
+            store.sql(
+                "INSERT INTO balances VALUES (?, ?, ?, ?)",
+                (addr_id, counts["balance"], name, addr_id)
+            )
+
+            addr_id += 1
+        
+        # Also add detroyed coins
+        store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (addr_id,))
+
     def initialize(store):
         """
         Create the database schema.
@@ -1326,6 +1383,9 @@ store._ddl['txout_approx'],
 
         store.config['keep_scriptsig'] = \
             "true" if store.args.keep_scriptsig else "false"
+
+        # Initialise Latium changes
+        store.init_latium_changes()
 
         store.save_config()
         store.commit()
@@ -2664,7 +2724,7 @@ store._ddl['txout_approx'],
 
     def disconnect_txs(store, block_id):
         for tx_id, in store.selectall(
-            "SELECT tx_id in block_tx WHERE block_id = ?",
+            "SELECT tx_id FROM block_tx WHERE block_id = ?",
             (block_id,)):
 
             # Get the balance adjustments for each watched address, if any
@@ -2689,7 +2749,7 @@ store._ddl['txout_approx'],
     def connect_txs(store, block_id):
 
         for tx_id, in store.selectall(
-            "SELECT tx_id in block_tx WHERE block_id = ?",
+            "SELECT tx_id FROM block_tx WHERE block_id = ?",
             (block_id,)):
 
             # Get the balance adjustments for each watched address, if any
