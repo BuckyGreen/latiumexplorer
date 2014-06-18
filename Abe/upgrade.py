@@ -932,7 +932,8 @@ def insert_chain_novacoin(store):
     store.insert_chain(Chain.create("NovaCoin"))
 
 def add_transparency_tables(store):
-    store.init_latium_changes()
+    if store.ready_for_latium_changes():
+        store.init_latium_changes()
 
 upgrades = [
     ('6',    add_block_value_in),

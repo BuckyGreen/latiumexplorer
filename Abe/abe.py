@@ -244,6 +244,8 @@ class Abe:
                 # for a response!  XXX Could use threads, timers, or a
                 # cron job.
                 abe.store.catch_up()
+            
+	    page['body'] += abe.search_form(page)
 
             handler(page)
         except PageNotFound:
@@ -395,21 +397,25 @@ class Abe:
         page['title'] = chain.name
 
         body = page['body']
-        body += abe.search_form(page)
 
         count = get_int_param(page, 'count') or 20
         hi = get_int_param(page, 'hi')
         orig_hi = hi
 
-        if hi is None:
-            row = abe.store.selectrow("""
-                SELECT b.block_height
-                  FROM block b
-                  JOIN chain c ON (c.chain_last_block_id = b.block_id)
-                 WHERE c.chain_id = ?
-            """, (chain.id,))
-            if row:
+        row = abe.store.selectrow("""
+            SELECT b.block_height
+            FROM block b
+            JOIN chain c ON (c.chain_last_block_id = b.block_id)
+            WHERE c.chain_id = ?
+        """, (chain.id,))
+
+        if row:
+	    max_height = row[0]
+            if hi is None:
                 hi = row[0]
+	else:
+	    max_height = 0
+
         if hi is None:
             if orig_hi is None and count > 0:
                 body += ['<p>I have no blocks in this chain.</p>']
@@ -436,10 +442,13 @@ class Abe:
             hi = int(rows[0][1])
         basename = os.path.basename(page['env']['PATH_INFO'])
 
-        nav = ['<div id="nav"><p id="navP1"><a href="',
-               basename, '?count=', str(count), '">&lt;&lt;</a>']
-        nav += [' <a href="', basename, '?hi=', str(hi + count),
-                 '&amp;count=', str(count), '">&lt;</a></p><p id="navP2">']
+        nav = ['<div id="nav"><p id="navP1">']
+	if max_height > hi:
+	    nav += ['<a href="',
+               basename, '?count=', str(count), '">&#9668;&#9668;</a>']
+            nav += [' <a href="', basename, '?hi=', str(hi + count),
+                 '&amp;count=', str(count), '">&#9668;<lt;</a>']
+        nav += ['</p><p id="navP2">']
                  
         for c in (20, 50, 100, 500, 1000):
             nav += [' ']
@@ -454,14 +463,13 @@ class Abe:
 
         nav += ['</p><p id="navP3">']         
                  
-        nav += [' ', '&gt;']
         if hi >= count:
-            nav[-1] = ['<a href="', basename, '?hi=', str(hi - count),
-                        '&amp;count=', str(count), '">', nav[-1], '</a>']
-        nav += [' ', '&gt;&gt;']
+            nav += ['<a href="', basename, '?hi=', str(hi - count),
+                        '&amp;count=', str(count), '"> &#9658;</a>']
+
         if hi != count - 1:
-            nav[-1] = ['<a href="', basename, '?hi=', str(count - 1),
-                        '&amp;count=', str(count), '">', nav[-1], '</a>']
+            nav += ['<a href="', basename, '?hi=', str(count - 1),
+                        '&amp;count=', str(count), '"> &#9658;&#9658;</a>']
         nav += ['</p></div>']
         
         extra = False
@@ -666,11 +674,11 @@ class Abe:
                           escape(chain.name), '?hi=', height, '">',
                           escape(chain.name), '</a> ', height]
 
-        body += ['<article class="module width_3_quarter center3Quart"><header><h3>BLOCK INFORMATION</h3></header><div class="module_content">']
+        body += ['<article class="module width_3_quarter center3Quart"><header><h3>BLOCK INFORMATION</h3></header><div class="module_content"><strong>']
         if is_stake_chain:
             body += [
                 'Proof of Stake' if is_proof_of_stake else 'Proof of Work',
-                ': ',
+                ':</strong> ',
                 format_satoshis(generated, chain), ' coins generated<br />\n']
         body += ['<strong>Hash:</strong> ', block_hash, '<br />\n']
 
@@ -1182,7 +1190,7 @@ class Abe:
     def search_form(abe, page):
         q = (page['params'].get('q') or [''])[0]
         return [
-            '<article class="module width_half centerHalf">'
+            '<article id="search" class="module width_half centerHalf">'
             '<header><h3>SEARCH</h3></header>'
             '<div class="module_content">'
             '<form action="', page['dotdot'], 'search">\n'
