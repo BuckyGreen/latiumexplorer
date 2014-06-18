@@ -2656,7 +2656,7 @@ store._ddl['txout_approx'],
                 store.connect_txs(b['block_id'])
             else:
                 # Initialise the Latium changes if block hash is c8ce9daa9588a9adf2cac97faa8cad4d78a08f53acce01061c28d006d35bbc68
-                if b['block_height'] == 13845 and store.ready_for_latium_changes(): 
+                if b['height'] == 13845 and store.ready_for_latium_changes(): 
                     store.init_latium_changes()
 
         if store.use_firstbits and b['height'] is not None:
