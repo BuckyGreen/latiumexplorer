@@ -1184,7 +1184,7 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
         """, ())
 
         for block_id, in rows:
-            store.connect_txs(block_id)
+            store.connect_txs(block_id, True)
 
         store.updated_for_latium = True
 
@@ -2784,7 +2784,7 @@ store._ddl['txout_approx'],
                     WHERE tx_id = ? AND block_id = ? AND addr_id = ?
                     """, (tx_id, block_id, addr_id))
 
-    def connect_txs(store, block_id):
+    def connect_txs(store, block_id, txs_only=False):
 
         for tx_id, in store.selectall(
             "SELECT tx_id FROM block_tx WHERE block_id = ?",
@@ -2796,12 +2796,13 @@ store._ddl['txout_approx'],
 
             for addr_id in values:
 
-                # Adjust balance
-                store.sql("""
-                    UPDATE balances
-                    SET balance = balance + ?
-                    WHERE id = ?
-                """, (values[addr_id], addr_id))
+                if not txs_only:
+                    # Adjust balance
+                    store.sql("""
+                        UPDATE balances
+                        SET balance = balance + ?
+                        WHERE id = ?
+                    """, (values[addr_id], addr_id))
 
                 # Add transaction to tracked_txs
 
