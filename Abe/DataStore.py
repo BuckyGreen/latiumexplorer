@@ -1121,7 +1121,7 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
             CREATE TABLE balances (
                 id         TINYINT      NOT NULL,
                 balance    NUMERIC(20)  NOT NULL,
-                name       VARCHAR(7)   NOT NULL,
+                name       VARCHAR(14)  NOT NULL,
                 pubkey_id  NUMERIC(26)  NULL,
                 PRIMARY KEY(id),
                 FOREIGN KEY(pubkey_id) REFERENCES pubkey(pubkey_id)
@@ -1171,7 +1171,7 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
             wallet_addr_id += 1
         
         # Also add detroyed coins
-        store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (addr_id,))
+        store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (wallet_addr_id,))
 
         # Now connect all txs on the main chain
 
