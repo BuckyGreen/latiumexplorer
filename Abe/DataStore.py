@@ -650,7 +650,7 @@ class DataStore(object):
         result["balance"] = row[0]
         result["count_in"] = row[1]
 
-        row = abe.store.selectall("""
+        row = store.selectall("""
             SELECT
                 SUM(-prevout.txout_value),
                 COUNT(*)
