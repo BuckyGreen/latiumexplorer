@@ -37,6 +37,8 @@ import base58
 
 SCHEMA_VERSION = "Abe38-lat1"
 
+LATIUM_CHANGES_BLOCK = "c8ce9daa9588a9adf2cac97faa8cad4d78a08f53acce01061c28d006d35bbc68"
+
 CONFIG_DEFAULTS = {
     "dbtype":             None,
     "connect_args":       None,
@@ -194,6 +196,9 @@ class DataStore(object):
 
         if args.rescan:
             store.sql("UPDATE datadir SET blkfile_number=1, blkfile_offset=0")
+
+        # See if Latium changes have been made to the database
+        store.updated_for_latium = store.selectrow("SHOW TABLES LIKE 'tracked_txs'") != None
 
         store._init_datadirs()
         store._init_chains()
@@ -1097,6 +1102,18 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
 )""",
             }
 
+    def ready_for_latium_changes(store):
+        # Check for the hash of the block where all wallet addresses are on the chain
+        dbhash = store.hashin_hex(LATIUM_CHANGES_BLOCK)
+
+        row = store.selectrow("""
+            SELECT 1
+              FROM block
+             WHERE block_hash = ? 
+        """, (dbhash,))
+
+        return row != None
+
     def init_latium_changes(store):
         store.log.info("Initialising Latium changes")
 
@@ -1168,6 +1185,8 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
 
         for block_id, in rows:
             store.connect_txs(block_id)
+
+        store.updated_for_latium = True
 
 
     def initialize(store):
@@ -2568,8 +2587,6 @@ store._ddl['txout_approx'],
 
     def _offer_block_to_chain(store, b, chain_id):
 
-        updated_for_latium = b['block_height'] >  #TODO Check database at startup and keep variable, do not check height like this
-
         if b['chain_work'] is None:
             in_longest = 0
         else:
@@ -2613,10 +2630,10 @@ store._ddl['txout_approx'],
                     winner_id = store.get_prev_block_id(winner_id)
                     winner_height -= 1
                 for block_id in to_disconnect:
-                    store.disconnect_block(block_id, chain_id, updated_for_latium)
+                    store.disconnect_block(block_id, chain_id)
                 for block_id in to_connect:
                     if block_id != b['block_id']: # to prevent duplicate connect_block
-                        store.connect_block(block_id, chain_id, updated_for_latium)
+                        store.connect_block(block_id, chain_id)
 
             elif b['hashPrev'] == GENESIS_HASH_PREV:
                 in_longest = 1  # Assume only one genesis block per chain.  XXX
@@ -2639,7 +2656,7 @@ store._ddl['txout_approx'],
 
             # Initialise the Latium changes if block hash is 9963f7637e22814c51c550607413da21fcd5a3ce08a0218bb70f82f983d3e51e
 
-            if b['block_height'] == : #TODO CHECK HASH NOT HEIGHT
+            if b['block_height'] == 13845 and not store.updated_for_latium and store.ready_for_latium_changes(): 
                 store.init_latium_changes()
 
         if store.use_firstbits and b['height'] is not None:
@@ -2793,24 +2810,24 @@ store._ddl['txout_approx'],
                     VALUES (?, ?, ?, ?, "")
                 """, (addr_id, block_id, tx_id, values[addr_id]))
 
-    def disconnect_block(store, block_id, chain_id, updated_for_latium):
+    def disconnect_block(store, block_id, chain_id):
         store.sql("""
             UPDATE chain_candidate
                SET in_longest = 0
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
 
-        if updated_for_latium:
+        if store.updated_for_latium:
             store.disconnect_txs(block_id)
 
-    def connect_block(store, block_id, chain_id, updated_for_latium):
+    def connect_block(store, block_id, chain_id):
         store.sql("""
             UPDATE chain_candidate
                SET in_longest = 1
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
 
-        if updated_for_latium:
+        if store.updated_for_latium:
             store.connect_txs(block_id)
 
     def lookup_txout(store, tx_hash, txout_pos):
