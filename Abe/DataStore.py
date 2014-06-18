@@ -1121,7 +1121,7 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
             CREATE TABLE balances (
                 id         TINYINT      NOT NULL,
                 balance    NUMERIC(20)  NOT NULL,
-                name       VARCHAR(14)  NOT NULL,
+                name       VARCHAR(15)  NOT NULL,
                 pubkey_id  NUMERIC(26)  NULL,
                 PRIMARY KEY(id),
                 FOREIGN KEY(pubkey_id) REFERENCES pubkey(pubkey_id)
@@ -2746,7 +2746,7 @@ store._ddl['txout_approx'],
         """, (tx_id,))
         
         for addr_id, out_val in rows:
-            values[addr_id] = out_val
+            values[addr_id] = -out_val
 
         rows = store.selectall("""
             SELECT balances.id, SUM(txout.txout_value) FROM txout
