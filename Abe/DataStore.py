@@ -2567,6 +2567,9 @@ store._ddl['txout_approx'],
             store._offer_block_to_chain(b, chain_id)
 
     def _offer_block_to_chain(store, b, chain_id):
+
+        updated_for_latium = b['block_height'] >  #TODO Check database at startup and keep variable, do not check height like this
+
         if b['chain_work'] is None:
             in_longest = 0
         else:
@@ -2610,10 +2613,10 @@ store._ddl['txout_approx'],
                     winner_id = store.get_prev_block_id(winner_id)
                     winner_height -= 1
                 for block_id in to_disconnect:
-                    store.disconnect_block(block_id, chain_id)
+                    store.disconnect_block(block_id, chain_id, updated_for_latium)
                 for block_id in to_connect:
                     if block_id != b['block_id']: # to prevent duplicate connect_block
-                        store.connect_block(block_id, chain_id)
+                        store.connect_block(block_id, chain_id, updated_for_latium)
 
             elif b['hashPrev'] == GENESIS_HASH_PREV:
                 in_longest = 1  # Assume only one genesis block per chain.  XXX
@@ -2634,9 +2637,9 @@ store._ddl['txout_approx'],
 
             store.connect_txs(b['block_id'])
 
-            # Initialise the Latium changes if block height is 13860
+            # Initialise the Latium changes if block hash is 9963f7637e22814c51c550607413da21fcd5a3ce08a0218bb70f82f983d3e51e
 
-            if b['block_height'] == 13860:
+            if b['block_height'] == : #TODO CHECK HASH NOT HEIGHT
                 store.init_latium_changes()
 
         if store.use_firstbits and b['height'] is not None:
@@ -2747,7 +2750,7 @@ store._ddl['txout_approx'],
 
             # Get the balance adjustments for each watched address, if any
             
-            values = get_tracked_adjustments(tx_id)
+            values = store.get_tracked_adjustments(tx_id)
 
             # Adjust balances
 
@@ -2772,7 +2775,7 @@ store._ddl['txout_approx'],
 
             # Get the balance adjustments for each watched address, if any
             
-            values = get_tracked_adjustments(tx_id)
+            values = store.get_tracked_adjustments(tx_id)
 
             for addr_id in values:
 
@@ -2790,21 +2793,25 @@ store._ddl['txout_approx'],
                     VALUES (?, ?, ?, ?, "")
                 """, (addr_id, block_id, tx_id, values[addr_id]))
 
-    def disconnect_block(store, block_id, chain_id):
+    def disconnect_block(store, block_id, chain_id, updated_for_latium):
         store.sql("""
             UPDATE chain_candidate
                SET in_longest = 0
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
-        store.disconnect_txs(block_id)
 
-    def connect_block(store, block_id, chain_id):
+        if updated_for_latium:
+            store.disconnect_txs(block_id)
+
+    def connect_block(store, block_id, chain_id, updated_for_latium):
         store.sql("""
             UPDATE chain_candidate
                SET in_longest = 1
              WHERE block_id = ? AND chain_id = ?""",
                   (block_id, chain_id))
-        store.connect_txs(block_id)
+
+        if updated_for_latium:
+            store.connect_txs(block_id)
 
     def lookup_txout(store, tx_hash, txout_pos):
         row = store.selectrow("""
