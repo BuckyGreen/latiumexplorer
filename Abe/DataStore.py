@@ -1149,7 +1149,7 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
             ["Admin Wallet",   "AdeFHiHAvw1ADDPL8FgfPb3DDaTKZuKx1i"],
         ]
             
-        addr_id = 0
+        wallet_addr_id = 0
 
         for name, addr in initialAddrs:
 
@@ -1165,10 +1165,10 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
 
             store.sql(
                 "INSERT INTO balances VALUES (?, ?, ?, ?)",
-                (addr_id, counts["balance"], name, addr_id)
+                (wallet_addr_id, counts["balance"], name, addr_id)
             )
 
-            addr_id += 1
+            wallet_addr_id += 1
         
         # Also add detroyed coins
         store.sql("INSERT INTO balances VALUES (?, 0, 'Destroyed Coins', DEFAULT)", (addr_id,))
