@@ -2806,7 +2806,7 @@ store._ddl['txout_approx'],
                 # Add transaction to tracked_txs
 
                 store.sql("""
-                    INSET INTO tracked_txs 
+                    INSERT INTO tracked_txs 
                     VALUES (?, ?, ?, ?, "")
                 """, (addr_id, block_id, tx_id, values[addr_id]))
 
