@@ -2652,12 +2652,12 @@ store._ddl['txout_approx'],
                    SET chain_last_block_id = ?
                  WHERE chain_id = ?""", (top['block_id'], chain_id))
 
-            store.connect_txs(b['block_id'])
-
-            # Initialise the Latium changes if block hash is 9963f7637e22814c51c550607413da21fcd5a3ce08a0218bb70f82f983d3e51e
-
-            if b['block_height'] == 13845 and not store.updated_for_latium and store.ready_for_latium_changes(): 
-                store.init_latium_changes()
+            if store.updated_for_latium:
+                store.connect_txs(b['block_id'])
+            else:
+                # Initialise the Latium changes if block hash is c8ce9daa9588a9adf2cac97faa8cad4d78a08f53acce01061c28d006d35bbc68
+                if b['block_height'] == 13845 and store.ready_for_latium_changes(): 
+                    store.init_latium_changes()
 
         if store.use_firstbits and b['height'] is not None:
             (addr_vers,) = store.selectrow("""
