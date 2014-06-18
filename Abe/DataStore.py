@@ -2738,7 +2738,7 @@ store._ddl['txout_approx'],
         values = {}
 
         rows = store.selectall("""
-            SELECT balances.addr_id, SUM(prevout.txout_value) FROM txin
+            SELECT balances.id, SUM(prevout.txout_value) FROM txin
             JOIN txout prevout ON (txin.txout_id = prevout.txout_id) 
             JOIN balances ON (prevout.pubkey_id = balances.pubkey_id)
             WHERE txin.tx_id = ?
@@ -2749,7 +2749,7 @@ store._ddl['txout_approx'],
             values[addr_id] = out_val
 
         rows = store.selectall("""
-            SELECT balances.addr_id, SUM(txout.txout_value) FROM txout
+            SELECT balances.id, SUM(txout.txout_value) FROM txout
             JOIN balances ON (txout.pubkey_id = balances.pubkey_id)
             WHERE txout.tx_id = ?
             GROUP BY txout.pubkey_id
