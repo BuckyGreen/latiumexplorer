@@ -1572,7 +1572,7 @@ class Abe:
             if c != count:
                 nav += ['<a href="', basename, '?count=', str(c)]
                 if hi is not None:
-                    nav += ['&amp;hi=', str(max(hi, c - 1))]
+                    nav += ['&amp;hi=', str(hi)]
                 nav += ['">']
             nav += [' ', str(c)]
             if c != count:
