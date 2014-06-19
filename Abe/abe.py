@@ -1583,10 +1583,9 @@ class Abe:
         if hi >= count:
             nav += ['<a href="', basename, '?hi=', str(hi - count),
                         '&amp;count=', str(count), '"> &#9658;</a>']
-
-        if hi != count - 1:
             nav += ['<a href="', basename, '?hi=', str(count - 1),
                         '&amp;count=', str(count), '"> &#9658;&#9658;</a>']
+
         nav += ['</p></div>']
         
         body += [
