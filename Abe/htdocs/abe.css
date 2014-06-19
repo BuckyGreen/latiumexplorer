@@ -10,14 +10,6 @@ th{
 section#main{
     width: 100%;
 }
-#search{
-    position: absolute;
-    top: 0;
-    left: 400px;
-    margin-left: 0;
-    width: auto;
-    right: 200px;
-}
 #footer{
     text-align: center;
     height: 60px;
