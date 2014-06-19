@@ -1619,6 +1619,10 @@ class Abe:
         hi = get_int_param(page, 'hi')
        
         wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
+        max_order_id = abe.store.get_last_order_id(wallet_id)
+        
+        if hi is None:
+            hi = max_order_id
 
         columns = ["Transaction", "Block", "Time", "Value", "Notes"]
 
@@ -1649,7 +1653,6 @@ class Abe:
                 notes
             ])
 
-        max_order_id = abe.store.get_last_order_id(wallet_id)
         abe.create_nav_table(page, wallet + " Wallet", count, max_order_id, hi, columns, table_rows)
 
     def handle_q(abe, page):
