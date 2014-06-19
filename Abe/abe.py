@@ -477,7 +477,7 @@ class Abe:
                 percent_destroyed,
             ])
 
-        create_nav_table(page, "Blocks", count, hi, columns, table_rows) 
+        abe.create_nav_table(page, "Blocks", count, hi, columns, table_rows) 
 
     def _show_block(abe, where, bind, page, dotdotblock, chain):
         address_version = ('\0' if chain is None
