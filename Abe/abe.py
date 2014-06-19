@@ -1618,7 +1618,11 @@ class Abe:
         count = get_int_param(page, 'count') or 20
         hi = get_int_param(page, 'hi')
        
-        wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
+        try:
+            wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
+        except KeyError:
+            return PageNotFound()
+
         max_order_id = abe.store.get_last_order_id(wallet_id)
         
         if hi is None:
