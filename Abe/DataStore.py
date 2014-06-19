@@ -1130,12 +1130,13 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
 
         store.ddl("""
             CREATE TABLE tracked_txs (
+                tx_order  BIGINT      NOT NULL,
                 addr_id   TINYINT     NOT NULL,
                 block_id  NUMERIC(14) NOT NULL,
                 tx_id     NUMERIC(26) NOT NULL,
                 value     NUMERIC(20) NOT NULL,
                 note      TEXT        NULL,
-                PRIMARY KEY(addr_id, block_id, tx_id),
+                PRIMARY KEY(tx_order, addr_id),
                 FOREIGN KEY(addr_id)  REFERENCES balances(id),
                 FOREIGN KEY(block_id) REFERENCES block(block_id),
                 FOREIGN KEY(tx_id)    REFERENCES tx(tx_id)
@@ -2778,11 +2779,11 @@ store._ddl['txout_approx'],
                     WHERE id = ?
                 """, (values[addr_id], addr_id))
 
-                # Delete tx from tracked_txs
-                store.sql("""
-                    DELETE FROM tracked_txs 
-                    WHERE tx_id = ? AND block_id = ? AND addr_id = ?
-                    """, (tx_id, block_id, addr_id))
+            # Delete tx from tracked_txs
+            store.sql("""
+                DELETE FROM tracked_txs 
+                WHERE block_id = ? 
+                """, (tx_id, block_id, addr_id))
 
     def connect_txs(store, block_id, txs_only=False):
 
@@ -2794,22 +2795,32 @@ store._ddl['txout_approx'],
             
             values = store.get_tracked_adjustments(tx_id)
 
-            for addr_id in values:
+            if values:
+                # Get the next transaction order id
+                row = store.selectrow("""
+                    SELECT tx_order
+                    FROM tracked_txs
+                    ORDER BY tx_order DESC LIMIT 1
+                """, ())
 
-                if not txs_only:
-                    # Adjust balance
+                tx_order = 0 if row is None else row[0] + 1
+
+                for addr_id in values:
+
+                    if not txs_only:
+                        # Adjust balance
+                        store.sql("""
+                            UPDATE balances
+                            SET balance = balance + ?
+                            WHERE id = ?
+                        """, (values[addr_id], addr_id))
+
+                    # Add transaction to tracked_txs
+
                     store.sql("""
-                        UPDATE balances
-                        SET balance = balance + ?
-                        WHERE id = ?
-                    """, (values[addr_id], addr_id))
-
-                # Add transaction to tracked_txs
-
-                store.sql("""
-                    INSERT INTO tracked_txs 
-                    VALUES (?, ?, ?, ?, "")
-                """, (addr_id, block_id, tx_id, values[addr_id]))
+                        INSERT INTO tracked_txs 
+                        VALUES (?, ?, ?, ?, ?, "")
+                    """, (tx_order, addr_id, block_id, tx_id, values[addr_id]))
 
     def disconnect_block(store, block_id, chain_id):
         store.sql("""

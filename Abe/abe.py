@@ -1617,6 +1617,20 @@ class Abe:
        
         wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
 
+        columns = ["Transaction", "Block", "Time", "Value", "Notes"]
+
+        rows = abe.store.selectall("""
+            SELECT tx.tx_hash, b.block_hash, b.block_height, b.block_nTime, trc.value, trc.note
+            FROM tracked_txs trc
+            JOIN tx ON (trc.tx_id = tx.tx_id)
+            JOIN block b ON (trc.block_id = b.block_id)
+            JOIN chain_candidate cc ON (b.block_id = cc.block_id)
+            WHERE cc.in_longest = 1
+            AND trc.addr_id = ?
+            AND trc.tx_order BETWEEN ? AND ?
+            ORDER BY trc.tx_order DESC LIMIT ?
+        """, (hi + count + 1, hi, count))
+
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
         if cmd is None:
