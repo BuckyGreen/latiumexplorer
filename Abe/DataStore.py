@@ -2783,7 +2783,7 @@ store._ddl['txout_approx'],
             store.sql("""
                 DELETE FROM tracked_txs 
                 WHERE block_id = ? 
-                """, (tx_id, block_id, addr_id))
+                """, (tx_id))
 
     def connect_txs(store, block_id, txs_only=False):
 
