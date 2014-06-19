@@ -1653,7 +1653,7 @@ class Abe:
                 block_hash +
                 '">' + str(block_height) + '</a>',
                 format_time(int(block_time)),
-                format_satoshis(value, chain),
+                format_satoshis(value, abe.chain_lookup_by_name("Latium")),
                 notes
             ])
 
