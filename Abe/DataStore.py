@@ -2785,6 +2785,15 @@ store._ddl['txout_approx'],
                 WHERE block_id = ? 
                 """, (tx_id))
 
+    def get_last_order_id(store, addr_id):
+        row = store.selectrow("""
+            SELECT tx_order
+            FROM tracked_txs
+            WHERE addr_id = ?
+            ORDER BY tx_order DESC LIMIT 1
+        """, (addr_id,))
+        return 0 if row is None else row[0]
+
     def connect_txs(store, block_id, txs_only=False):
 
         for tx_id, in store.selectall(
@@ -2806,14 +2815,8 @@ store._ddl['txout_approx'],
                     """, (values[addr_id], addr_id))
 
                 # Get the next transaction order id
-                row = store.selectrow("""
-                    SELECT tx_order
-                    FROM tracked_txs
-                    WHERE addr_id = ?
-                    ORDER BY tx_order DESC LIMIT 1
-                """, (addr_id,))
 
-                tx_order = 0 if row is None else row[0] + 1
+                tx_order = store.get_last_order_id(addr_id) + 1
 
                 # Add transaction to tracked_txs
 

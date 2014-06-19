@@ -1614,6 +1614,9 @@ class Abe:
 
         if wallet is None:
             return PageNotFound()
+
+        count = get_int_param(page, 'count') or 20
+        hi = get_int_param(page, 'hi')
        
         wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
 
@@ -1629,7 +1632,25 @@ class Abe:
             AND trc.addr_id = ?
             AND trc.tx_order BETWEEN ? AND ?
             ORDER BY trc.tx_order DESC LIMIT ?
-        """, (hi + count + 1, hi, count))
+        """, (wallet_id, hi + count + 1, hi, count))
+
+        table_rows = []
+
+        for tx_hash, block_hash, block_height, block_time, value, notes in rows:
+            table_rows.append([
+                '<a href="' + page['dotdot'] + 'tx/' +
+                tx_hash
+                '">' + tx_hash[:10] + '...</a>',
+                '<a href="' + page['dotdot'] + 'block/' +
+                block_hash
+                '">' + str(block_height) + '</a>',
+                format_time(int(block_time)),
+                format_satoshis(value, chain),
+                notes
+            ])
+
+        max_order_id = abe.store.get_last_order_id(wallet_id)
+        abe.create_nav_table(page, wallet + " Wallet", count, max_order_id, hi, columns, table_rows)
 
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
