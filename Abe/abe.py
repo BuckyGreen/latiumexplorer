@@ -1617,8 +1617,6 @@ class Abe:
         count = get_int_param(page, 'count') or 20
         hi = get_int_param(page, 'hi')
 
-        hi = hi - (hi % count) + count - 1
-       
         try:
             wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
         except KeyError:
@@ -1628,6 +1626,8 @@ class Abe:
         
         if hi is None:
             hi = max_order_id
+
+        hi = hi - (hi % count) + count - 1
 
         columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40%", "Notes"]]
 
