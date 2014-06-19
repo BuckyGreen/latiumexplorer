@@ -1657,7 +1657,7 @@ class Abe:
                 notes
             ])
 
-        abe.create_nav_table(page, wallet + " Wallet", count, max_order_id, hi, columns, table_rows, "40%")
+        abe.create_nav_table(page, wallet + " Wallet", count, max_order_id, hi, columns, table_rows)
 
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
