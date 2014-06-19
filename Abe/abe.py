@@ -1624,7 +1624,7 @@ class Abe:
 
         max_order_id = abe.store.get_last_order_id(wallet_id)
         
-        if hi is None:
+        if hi is None or hi > max_order_id:
             hi = max_order_id
         else:
             hi = hi - (hi % count) + count - 1
