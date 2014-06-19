@@ -394,10 +394,6 @@ class Abe:
             abe.call_handler(page, cmd)
             return
 
-        page['title'] = chain.name
-
-        body = page['body']
-
         count = get_int_param(page, 'count') or 20
         hi = get_int_param(page, 'hi')
         orig_hi = hi
@@ -440,56 +436,13 @@ class Abe:
 
         if hi is None:
             hi = int(rows[0][1])
-        basename = os.path.basename(page['env']['PATH_INFO'])
 
-        nav = ['<div id="nav"><p id="navP1">']
-	if max_height > hi:
-	    nav += ['<a href="',
-               basename, '?count=', str(count), '">&#9668;&#9668;</a>']
-            nav += [' <a href="', basename, '?hi=', str(hi + count),
-                 '&amp;count=', str(count), '">&#9668;<lt;</a>']
-        nav += ['</p><p id="navP2">']
-                 
-        for c in (20, 50, 100, 500, 1000):
-            nav += [' ']
-            if c != count:
-                nav += ['<a href="', basename, '?count=', str(c)]
-                if hi is not None:
-                    nav += ['&amp;hi=', str(max(hi, c - 1))]
-                nav += ['">']
-            nav += [' ', str(c)]
-            if c != count:
-                nav += ['</a>']
+        columns = ['Block', 'Approx. Time', 'Transactions', 'Value Out',
+                 'Difficulty', 'Outstanding', 'Average Age', 'Chain Age',
+                 '% <a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">CoinDD</a>']
 
-        nav += ['</p><p id="navP3">']         
-                 
-        if hi >= count:
-            nav += ['<a href="', basename, '?hi=', str(hi - count),
-                        '&amp;count=', str(count), '"> &#9658;</a>']
+        table_rows = []
 
-        if hi != count - 1:
-            nav += ['<a href="', basename, '?hi=', str(count - 1),
-                        '&amp;count=', str(count), '"> &#9658;&#9658;</a>']
-        nav += ['</p></div>']
-        
-        extra = False
-        #extra = True
-        body += [
-                 '<article class="module width_full">'
-                 '<header><h3>BLOCKS</h3></header>'
-                 , nav, '\n',
-                 '<table class="tablesorter" cellspacing="0"><thead>'
-                 '<tr><th>Block</th><th>Approx. Time</th>',
-                 '<th>Transactions</th><th>Value Out</th>',
-                 '<th>Difficulty</th><th>Outstanding</th>',
-                 '<th>Average Age</th><th>Chain Age</th>',
-                 '<th>% ',
-                 '<a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">',
-                 'CoinDD</a></th>',
-                 ['<th>Satoshi-seconds</th>',
-                  '<th>Total ss</th>']
-                 if extra else '',
-                 '</tr></thead>\n']
         for row in rows:
             (hash, height, nTime, num_tx, nBits, value_out,
              seconds, ss, satoshis, destroyed, total_ss) = row
@@ -510,23 +463,21 @@ class Abe:
             else:
                 percent_destroyed = '%5g%%' % (100.0 - (100.0 * ss / total_ss))
 
-            body += [
-                '<tr><td><a href="', page['dotdot'], 'block/',
-                abe.store.hashout_hex(hash),
-                '">', height, '</a>'
-                '</td><td>', format_time(int(nTime)),
-                '</td><td>', num_tx,
-                '</td><td>', format_satoshis(value_out, chain),
-                '</td><td>', util.calculate_difficulty(int(nBits)),
-                '</td><td>', format_satoshis(satoshis, chain),
-                '</td><td>', avg_age,
-                '</td><td>', '%5g' % (seconds / 86400.0),
-                '</td><td>', percent_destroyed,
-                ['</td><td>', '%8g' % ss,
-                 '</td><td>', '%8g' % total_ss] if extra else '',
-                '</td></tr>\n']
+            table_rows.append([
+                '<a href="', page['dotdot'], 'block/' +
+                abe.store.hashout_hex(hash) +
+                '">' + height + '</a>',
+                format_time(int(nTime)),
+                num_tx,
+                format_satoshis(value_out, chain),
+                util.calculate_difficulty(int(nBits)),
+                format_satoshis(satoshis, chain),
+                avg_age,
+                '%5g' % (seconds / 86400.0),
+                percent_destroyed,
+            ])
 
-        body += ['</table>\n', nav, '</article>\n']
+        create_nav_table(page, "Blocks", count, hi, columns, table_rows) 
 
     def _show_block(abe, where, bind, page, dotdotblock, chain):
         address_version = ('\0' if chain is None
@@ -1601,6 +1552,69 @@ class Abe:
         page['content_type'] = 'text/plain'
         page['template'] = '%(body)s'
         page['body'] = func(page, page['chain'])
+
+    def create_nav_table(abe, page, title, count, hi, columns, rows):
+        page['title'] = title
+        body = page['body']
+
+        basename = os.path.basename(page['env']['PATH_INFO'])
+
+        nav = ['<div id="nav"><p id="navP1">']
+	if max_height > hi:
+	    nav += ['<a href="',
+               basename, '?count=', str(count), '">&#9668;&#9668;</a>']
+            nav += [' <a href="', basename, '?hi=', str(hi + count),
+                 '&amp;count=', str(count), '">&#9668;<lt;</a>']
+        nav += ['</p><p id="navP2">']
+                 
+        for c in (20, 50, 100, 500, 1000):
+            nav += [' ']
+            if c != count:
+                nav += ['<a href="', basename, '?count=', str(c)]
+                if hi is not None:
+                    nav += ['&amp;hi=', str(max(hi, c - 1))]
+                nav += ['">']
+            nav += [' ', str(c)]
+            if c != count:
+                nav += ['</a>']
+
+        nav += ['</p><p id="navP3">']         
+                 
+        if hi >= count:
+            nav += ['<a href="', basename, '?hi=', str(hi - count),
+                        '&amp;count=', str(count), '"> &#9658;</a>']
+
+        if hi != count - 1:
+            nav += ['<a href="', basename, '?hi=', str(count - 1),
+                        '&amp;count=', str(count), '"> &#9658;&#9658;</a>']
+        nav += ['</p></div>']
+        
+        body += [
+                 '<article class="module width_full">'
+                 '<header><h3>', title, '</h3></header>'
+                 , nav, '\n',
+                 '<table class="tablesorter" cellspacing="0"><thead>'
+                 '<tr>']
+        
+        for column in columns:
+            body += ['<th>', column, '</th>']
+
+        body += ['</tr></thead>\n']
+
+        for row in rows:
+            body += ['<tr>']
+
+            for cell in row:
+                body += ['<td>', cell, '</td>']
+
+        body += ['</table>\n', nav, '</article>\n']
+
+    def handle_wallets(abe, page):
+        wallet = wsgiref.util.shift_path_info(page['env'])
+        if wallet is None:
+            return PageNotFound()
+       
+       wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin", 3}[wallet]
 
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
