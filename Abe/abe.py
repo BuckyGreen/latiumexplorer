@@ -1648,7 +1648,7 @@ class Abe:
             table_rows.append([
                 '<a href="' + page['dotdot'] + 'tx/' +
                 tx_hash +
-                '">' + tx_hash[:10] + '...</a>',
+                '">' + tx_hash + '</a>',
                 '<a href="' + page['dotdot'] + 'block/' +
                 block_hash +
                 '">' + str(block_height) + '</a>',
