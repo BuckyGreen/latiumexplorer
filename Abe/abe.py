@@ -477,7 +477,7 @@ class Abe:
                 percent_destroyed,
             ])
 
-        abe.create_nav_table(page, "Blocks", count, hi, columns, table_rows) 
+        abe.create_nav_table(page, "Blocks", count, max_height, hi, columns, table_rows) 
 
     def _show_block(abe, where, bind, page, dotdotblock, chain):
         address_version = ('\0' if chain is None
@@ -1553,7 +1553,7 @@ class Abe:
         page['template'] = '%(body)s'
         page['body'] = func(page, page['chain'])
 
-    def create_nav_table(abe, page, title, count, hi, columns, rows):
+    def create_nav_table(abe, page, title, count, max_height, hi, columns, rows):
         page['title'] = title
         body = page['body']
 
