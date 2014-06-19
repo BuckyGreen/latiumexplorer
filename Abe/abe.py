@@ -466,7 +466,7 @@ class Abe:
             table_rows.append([
                 '<a href="', page['dotdot'], 'block/' +
                 abe.store.hashout_hex(hash) +
-                '">' + height + '</a>',
+                '">' + str(height) + '</a>',
                 format_time(int(nTime)),
                 num_tx,
                 format_satoshis(value_out, chain),
