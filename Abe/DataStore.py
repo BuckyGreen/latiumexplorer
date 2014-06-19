@@ -2795,32 +2795,32 @@ store._ddl['txout_approx'],
             
             values = store.get_tracked_adjustments(tx_id)
 
-            if values:
+            for addr_id in values:
+
+                if not txs_only:
+                    # Adjust balance
+                    store.sql("""
+                        UPDATE balances
+                        SET balance = balance + ?
+                        WHERE id = ?
+                    """, (values[addr_id], addr_id))
+
                 # Get the next transaction order id
                 row = store.selectrow("""
                     SELECT tx_order
                     FROM tracked_txs
+                    WHERE addr_id = ?
                     ORDER BY tx_order DESC LIMIT 1
-                """, ())
+                """, (addr_id,))
 
                 tx_order = 0 if row is None else row[0] + 1
 
-                for addr_id in values:
+                # Add transaction to tracked_txs
 
-                    if not txs_only:
-                        # Adjust balance
-                        store.sql("""
-                            UPDATE balances
-                            SET balance = balance + ?
-                            WHERE id = ?
-                        """, (values[addr_id], addr_id))
-
-                    # Add transaction to tracked_txs
-
-                    store.sql("""
-                        INSERT INTO tracked_txs 
-                        VALUES (?, ?, ?, ?, ?, "")
-                    """, (tx_order, addr_id, block_id, tx_id, values[addr_id]))
+                store.sql("""
+                    INSERT INTO tracked_txs 
+                    VALUES (?, ?, ?, ?, ?, "")
+                """, (tx_order, addr_id, block_id, tx_id, values[addr_id]))
 
     def disconnect_block(store, block_id, chain_id):
         store.sql("""
