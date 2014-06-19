@@ -1563,7 +1563,7 @@ class Abe:
 	if max_height > hi:
 	    nav += ['<a href="',
                basename, '?count=', str(count), '">&#9668;&#9668;</a>']
-            nav += [' <a href="', basename, '?hi=', str(hi + count),
+            nav += [' <a href="', basename, '?hi=', str(min(max_height, hi + count)),
                  '&amp;count=', str(count), '">&#9668;<lt;</a>']
         nav += ['</p><p id="navP2">']
                  
