@@ -1615,7 +1615,7 @@ class Abe:
         if wallet is None:
             return PageNotFound()
        
-        wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin", 3}[wallet]
+        wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
 
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
