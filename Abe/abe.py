@@ -1940,7 +1940,7 @@ class Abe:
             return "Please specifiy the Latium chain: /chain/Latium/q/circulation"
 
         row = abe.store.selectrow("SELECT SUM(balance) FROM balances", ())
-        return format_satoshis(row[0] + abe.gettotalsatoshis(chain), chain)
+        return format_satoshis(abe.gettotalsatoshis(chain) - row[0], chain)
 
     def q_getreceivedbyaddress(abe, page, chain):
         """shows the amount ever received by a given address."""
