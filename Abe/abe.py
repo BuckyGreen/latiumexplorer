@@ -1626,8 +1626,8 @@ class Abe:
         
         if hi is None:
             hi = max_order_id
-
-        hi = hi - (hi % count) + count - 1
+        else:
+            hi = hi - (hi % count) + count - 1
 
         columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40%", "Notes"]]
 
