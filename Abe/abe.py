@@ -464,7 +464,7 @@ class Abe:
                 percent_destroyed = '%5g%%' % (100.0 - (100.0 * ss / total_ss))
 
             table_rows.append([
-                '<a href="', page['dotdot'], 'block/' +
+                '<a href="' + page['dotdot'] + 'block/' +
                 abe.store.hashout_hex(hash) +
                 '">' + str(height) + '</a>',
                 format_time(int(nTime)),
