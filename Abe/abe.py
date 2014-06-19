@@ -1639,10 +1639,10 @@ class Abe:
         for tx_hash, block_hash, block_height, block_time, value, notes in rows:
             table_rows.append([
                 '<a href="' + page['dotdot'] + 'tx/' +
-                tx_hash
+                tx_hash +
                 '">' + tx_hash[:10] + '...</a>',
                 '<a href="' + page['dotdot'] + 'block/' +
-                block_hash
+                block_hash +
                 '">' + str(block_height) + '</a>',
                 format_time(int(block_time)),
                 format_satoshis(value, chain),
