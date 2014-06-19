@@ -1935,6 +1935,10 @@ class Abe:
 
     def q_circulation(abe, page, chain):
         """Total amount of Latium in circulation"""
+
+        if chain is None:
+            return "Please specifiy the Latium chain: /chain/Latium/q/circulation"
+
         row = abe.store.selectrow("SELECT SUM(balance) FROM balances", ())
         return format_satoshis(row[0] + abe.gettotalsatoshis(chain), chain)
 
