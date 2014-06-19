@@ -437,9 +437,9 @@ class Abe:
         if hi is None:
             hi = int(rows[0][1])
 
-        columns = ['Block', 'Approx. Time', 'Transactions', 'Value Out',
-                 'Difficulty', 'Outstanding', 'Average Age', 'Chain Age',
-                 '% <a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">CoinDD</a>']
+        columns = [[None, 'Block'], [None, 'Approx. Time'], [None, 'Transactions'], [None, 'Value Out'],
+                 [None, 'Difficulty'], [None, 'Outstanding'], [None, 'Average Age'], [None, 'Chain Age'],
+                 [None, '% <a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">CoinDD</a>']]
 
         table_rows = []
 
@@ -1597,7 +1597,7 @@ class Abe:
                  '<tr>']
         
         for column in columns:
-            body += ['<th>', column, '</th>']
+            body += ['<th>' if column[0] is None else '<th style="width: ' + column[0] + ';">', column[1], '</th>']
 
         body += ['</tr></thead>\n']
 
@@ -1628,7 +1628,7 @@ class Abe:
         if hi is None:
             hi = max_order_id
 
-        columns = ["Transaction", "Block", "Time", "Value", "Notes"]
+        columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40px", "Notes"]]
 
         rows = abe.store.selectall("""
             SELECT tx.tx_hash, b.block_hash, b.block_height, b.block_nTime, trc.value, trc.note
@@ -1657,7 +1657,7 @@ class Abe:
                 notes
             ])
 
-        abe.create_nav_table(page, wallet + " Wallet", count, max_order_id, hi, columns, table_rows)
+        abe.create_nav_table(page, wallet + " Wallet", count, max_order_id, hi, columns, table_rows, "40%")
 
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
