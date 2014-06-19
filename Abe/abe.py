@@ -1608,14 +1608,24 @@ class Abe:
 
         body += ['</table>\n', nav, '</article>\n']
 
+    def get_count_high(abe, maxhi):
+
+        count = get_int_param(page, 'count') or 20
+        hi = get_int_param(page, 'hi')
+
+        if hi is not None:
+            hi = hi - (hi % count) + count - 1
+
+        if hi is None or hi > maxhi:
+            hi = maxhi
+
+        return (count, hi)
+
     def handle_wallets(abe, page):
         wallet = wsgiref.util.shift_path_info(page['env'])
 
         if wallet is None:
             return PageNotFound()
-
-        count = get_int_param(page, 'count') or 20
-        hi = get_int_param(page, 'hi')
 
         try:
             wallet_id = {"Premine": 0, "Holding": 1, "Payout": 2, "Admin": 3}[wallet]
@@ -1623,12 +1633,8 @@ class Abe:
             return PageNotFound()
 
         max_order_id = abe.store.get_last_order_id(wallet_id)
+        count, hi = abe.get_count_high(max_order_id)
         
-        if hi is None or hi > max_order_id:
-            hi = max_order_id
-        else:
-            hi = hi - (hi % count) + count - 1
-
         columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40%", "Notes"]]
 
         rows = abe.store.selectall("""
