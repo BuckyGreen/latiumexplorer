@@ -1608,7 +1608,7 @@ class Abe:
 
         body += ['</table>\n', nav, '</article>\n']
 
-    def get_count_high(abe, maxhi):
+    def get_count_high(abe, page, maxhi):
 
         count = get_int_param(page, 'count') or 20
         hi = get_int_param(page, 'hi')
@@ -1633,7 +1633,7 @@ class Abe:
             return PageNotFound()
 
         max_order_id = abe.store.get_last_order_id(wallet_id)
-        count, hi = abe.get_count_high(max_order_id)
+        count, hi = abe.get_count_high(page, max_order_id)
         
         columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40%", "Notes"]]
 
