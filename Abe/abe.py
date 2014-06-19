@@ -1640,7 +1640,7 @@ class Abe:
             AND trc.addr_id = ?
             AND trc.tx_order BETWEEN ? AND ?
             ORDER BY trc.tx_order DESC LIMIT ?
-        """, (wallet_id, hi + count + 1, hi, count))
+        """, (wallet_id, hi - count + 2, hi + 1, count))
 
         table_rows = []
 
