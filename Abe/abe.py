@@ -394,10 +394,6 @@ class Abe:
             abe.call_handler(page, cmd)
             return
 
-        count = get_int_param(page, 'count') or 20
-        hi = get_int_param(page, 'hi')
-        orig_hi = hi
-
         row = abe.store.selectrow("""
             SELECT b.block_height
             FROM block b
@@ -405,18 +401,11 @@ class Abe:
             WHERE c.chain_id = ?
         """, (chain.id,))
 
-        if row:
-	    max_height = row[0]
-            if hi is None:
-                hi = row[0]
-	else:
-	    max_height = 0
+	max_height = row[0] if row else 0
+        count, hi = abe.get_count_high(page, max_height)
 
         if hi is None:
-            if orig_hi is None and count > 0:
-                body += ['<p>I have no blocks in this chain.</p>']
-            else:
-                body += ['<p class="error">'
+            body += ['<p class="error">'
                          'The requested range contains no blocks.</p>\n']
             return
 
@@ -433,9 +422,6 @@ class Abe:
                AND cc.in_longest = 1
              ORDER BY cc.block_height DESC LIMIT ?
         """, (chain.id, hi - count + 1, hi, count))
-
-        if hi is None:
-            hi = int(rows[0][1])
 
         columns = [[None, 'Block'], [None, 'Approx. Time'], [None, 'Transactions'], [None, 'Value Out'],
                  [None, 'Difficulty'], [None, 'Outstanding'], [None, 'Average Age'], [None, 'Chain Age'],
