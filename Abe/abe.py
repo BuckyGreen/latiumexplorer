@@ -1628,7 +1628,7 @@ class Abe:
         if hi is None:
             hi = max_order_id
 
-        columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40px", "Notes"]]
+        columns = [[None, "Transaction"], [None, "Block"], [None, "Time"], [None, "Value"], ["40%", "Notes"]]
 
         rows = abe.store.selectall("""
             SELECT tx.tx_hash, b.block_hash, b.block_height, b.block_nTime, trc.value, trc.note
