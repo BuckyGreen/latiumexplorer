@@ -498,7 +498,7 @@ border-bottom: 1px dotted #ccc;
 .tablesorter thead tr, .tablesorterpager thead tr {
 	height: 34px;
 	background-color: #EEEFEF;
-	text-align: left;
+	text-align: center;
 	cursor: pointer;
 }
 
@@ -508,7 +508,8 @@ border-bottom: 1px dotted #ccc;
 }
 
 .tablesorter td , .tablesorterpager td {
-padding: 15px 10px;
+	padding: 15px 10px;
+	text-align: center;
 }
 
 .tablesorter input[type=image], .tablesorterpager input[type=image] {
