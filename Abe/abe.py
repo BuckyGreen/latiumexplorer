@@ -1893,8 +1893,18 @@ class Abe:
             page['content_type'] = 'image/svg+xml'
             return ret
 
+    def gettotalsatoshis(abe, chain):
+        row = abe.store.selectrow("""
+            SELECT b.block_total_satoshis
+              FROM chain c
+              LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
+             WHERE c.chain_id = ?
+        """, (chain.id,))
+        return row[0] if row else 0
+
     def q_totalbc(abe, page, chain):
         """shows the amount of currency ever mined."""
+
         if chain is None:
             return 'Shows the amount of currency ever mined.\n' \
                 'This differs from the amount in circulation when' \
@@ -1903,14 +1913,11 @@ class Abe:
                 ' support future block numbers, and it returns a sum of' \
                 ' observed generations rather than a calculated value.\n' \
                 '/chain/CHAIN/q/totalbc[/HEIGHT]\n'
+
         height = path_info_uint(page, None)
+
         if height is None:
-            row = abe.store.selectrow("""
-                SELECT b.block_total_satoshis
-                  FROM chain c
-                  LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
-                 WHERE c.chain_id = ?
-            """, (chain.id,))
+            satoshis = abe.gettotalsatoshis(chain)
         else:
             row = abe.store.selectrow("""
                 SELECT b.block_total_satoshis
@@ -1922,7 +1929,14 @@ class Abe:
             """, (chain.id, height))
             if not row:
                 return 'ERROR: block %d not seen yet' % (height,)
-        return format_satoshis(row[0], chain) if row else 0
+            satoshis = row[0]
+
+        return format_satoshis(satoshis, chain)
+
+    def q_circulation(abe, page, chain):
+        """Total amount of Latium in circulation"""
+        row = abe.store.selectrow("SELECT SUM(balance) FROM balances", ())
+        return format_satoshis(row[0] + abe.gettotalsatoshis(chain), chain)
 
     def q_getreceivedbyaddress(abe, page, chain):
         """shows the amount ever received by a given address."""
