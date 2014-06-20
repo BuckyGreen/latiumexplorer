@@ -1557,7 +1557,7 @@ class Abe:
             nav += [' ']
             print c,
             print " C ",
-            print type(c),
+            print type(c)
             print count,
             print " count ",
             print type(count)
