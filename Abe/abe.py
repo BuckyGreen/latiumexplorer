@@ -356,7 +356,7 @@ class Abe:
                     body += [
                         '<td>', format_time(started)[:10], '</td>',
                         '<td>', '%5g' % (chain_age / 86400.0), '</td>',
-                        '<td>', format_satoshis(satoshis, chain), '</td>',
+                        '<td>', format_satoshis(satoshis, chain, True), '</td>',
                         '<td>', avg_age, '</td>',
                         '<td>', percent_destroyed, '</td>']
 
@@ -455,9 +455,9 @@ class Abe:
                 '">' + str(height) + '</a>',
                 format_time(int(nTime)),
                 num_tx,
-                format_satoshis(value_out, chain),
+                format_satoshis(value_out, chain, True),
                 util.calculate_difficulty(int(nBits)),
-                format_satoshis(satoshis, chain),
+                format_satoshis(satoshis, chain, True),
                 avg_age,
                 '%5g' % (seconds / 86400.0),
                 percent_destroyed,
@@ -616,7 +616,7 @@ class Abe:
             body += [
                 'Proof of Stake' if is_proof_of_stake else 'Proof of Work',
                 ':</strong> ',
-                format_satoshis(generated, chain), ' coins generated<br />\n']
+                format_satoshis(generated, chain, True), ' coins generated<br />\n']
         body += ['<strong>Hash:</strong> ', block_hash, '<br />\n']
 
         if prev_block_hash is not None:
@@ -639,8 +639,8 @@ class Abe:
 
             '<br /><strong>Nonce:</strong> ', nNonce, '<br />\n',
             '<strong>Transactions:</strong> ', num_tx, '<br />\n',
-            '<strong>Value out:</strong> ', format_satoshis(value_out, chain), '<br />\n',
-            '<strong>Transaction Fees:</strong> ', format_satoshis(block_fees, chain), '<br />\n',
+            '<strong>Value out:</strong> ', format_satoshis(value_out, chain, True), '<br />\n',
+            '<strong>Transaction Fees:</strong> ', format_satoshis(block_fees, chain, True), '<br />\n',
 
             ['<strong>Average Coin Age:</strong> %6g' % (ss / 86400.0 / satoshis,),
              ' days<br />\n']
@@ -648,7 +648,7 @@ class Abe:
 
             '' if destroyed is None else
             ['<strong>Coin-days Destroyed:</strong> ',
-             format_satoshis(destroyed / 86400.0, chain), '<br />\n'],
+             format_satoshis(destroyed / 86400.0, chain, True), '<br />\n'],
 
             ['<strong>Cumulative Coin-days Destroyed:</strong> %6g%%<br />\n' %
              (100 * (1 - float(ss) / total_ss),)]
@@ -669,20 +669,20 @@ class Abe:
             tx = txs[tx_id]
             body += ['<tr><td><a href="../tx/' + tx['hash'] + '">',
                      tx['hash'][:10], '...</a>'
-                     '</td><td>', format_satoshis(tx['fees'], chain),
+                     '</td><td>', format_satoshis(tx['fees'], chain, True),
                      '</td><td>', tx['size'] / 1000.0,
                      '</td><td>']
             if tx is coinbase_tx:
                 body += [
                     'POS ' if is_proof_of_stake else '',
-                    'Generation: ', format_satoshis(generated, chain), ' + ',
-                    format_satoshis(block_fees, chain), ' total fees']
+                    'Generation: ', format_satoshis(generated, chain, True), ' + ',
+                    format_satoshis(block_fees, chain, True), ' total fees']
             else:
                 for txin in tx['in']:
                     body += hash_to_address_link(
                         address_version, txin['pubkey_hash'], page['dotdot'])
                     body += [
-                        ': ', format_satoshis(txin['value'], chain), '<br />']
+                        ': ', format_satoshis(txin['value'], chain, True), '<br />']
             body += ['</td><td>']
             for txout in tx['out']:
                 if is_proof_of_stake:
@@ -690,7 +690,7 @@ class Abe:
                         assert txout['value'] == 0
                         assert len(tx['out']) == 1
                         body += [
-                            format_satoshis(posgen, chain),
+                            format_satoshis(posgen, chain, True),
                             ' included in the following transaction']
                         continue
                     if txout['value'] == 0:
@@ -698,7 +698,7 @@ class Abe:
 
                 body += hash_to_address_link(
                     address_version, txout['pubkey_hash'], page['dotdot'])
-                body += [': ', format_satoshis(txout['value'], chain), '<br />']
+                body += [': ', format_satoshis(txout['value'], chain, True), '<br />']
             body += ['</td></tr>\n']
         body += '</table></article>\n'
 
@@ -797,7 +797,7 @@ class Abe:
                     '">', row['o_hash'][:10], '...:', row['o_pos'], '</a>']
             body += [
                 '</td>\n',
-                '<td>', format_satoshis(row['value'], chain), '</td>\n',
+                '<td>', format_satoshis(row['value'], chain, True), '</td>\n',
                 '<td>']
             if row['binaddr'] is None:
                 body += ['Unknown']
@@ -884,14 +884,14 @@ class Abe:
         body += [
             '<strong>Number of inputs:</strong> ', len(in_rows),
             ' (<a href="#inputs">Jump to inputs</a>)<br />\n',
-            '<strong>Total in:</strong> ', format_satoshis(value_in, chain), '<br />\n',
+            '<strong>Total in:</strong> ', format_satoshis(value_in, chain, True), '<br />\n',
             '<strong>Number of outputs:</strong> ', len(out_rows),
             ' (<a href="#outputs">Jump to outputs</a>)<br />\n',
-            '<strong>Total out:</strong> ', format_satoshis(value_out, chain), '<br />\n',
+            '<strong>Total out:</strong> ', format_satoshis(value_out, chain, True), '<br />\n',
             '<strong>Size:</strong> ', tx_size, ' bytes<br />\n',
             '<strong>Fee:</strong> ', format_satoshis(0 if is_coinbase else
                                      (value_in and value_out and
-                                      value_in - value_out), chain),
+                                      value_in - value_out), chain, True),
             '<br />\n',
             '<a href="../rawtx/', tx_hash, '"><strong>Raw transaction</strong></a><br />\n']
         body += ['</div></article>\n',
@@ -1060,7 +1060,7 @@ class Abe:
             for chain in chains:
                 if ret:
                     ret += [', ']
-                ret += [format_satoshis(amounts[chain_id], chain),
+                ret += [format_satoshis(amounts[chain_id], chain, True),
                         ' ', escape(chain.code3)]
                 if link:
                     other = util.hash_to_address(
@@ -1115,11 +1115,11 @@ class Abe:
                          '">', elt['height'], '</a></td><td>',
                          format_time(elt['nTime']), '</td><td>']
                 if elt['value'] < 0:
-                    body += ['<span class="negativeValue">-', format_satoshis(-elt['value'], chain), '</span>']
+                    body += ['<span class="negativeValue">-', format_satoshis(-elt['value'], chain, True), '</span>']
                 else:
-                    body += [format_satoshis(elt['value'], chain)]
+                    body += [format_satoshis(elt['value'], chain, True)]
                 body += ['</td><td>',
-                         format_satoshis(balance[elt['chain_id']], chain),
+                         format_satoshis(balance[elt['chain_id']], chain, True),
                          '</td>',
                          '</tr>\n']
         body += ['</table></article>\n']
@@ -1555,12 +1555,6 @@ class Abe:
                  
         for c in (20, 50, 100, 500, 1000):
             nav += [' ']
-            print c,
-            print " C ",
-            print type(c)
-            print count,
-            print " count ",
-            print type(count)
             if c != count:
                 print "HERE"
                 nav += ['<a href="', basename, '?count=', str(c)]
@@ -1648,7 +1642,7 @@ class Abe:
 
         for tx_hash, block_hash, block_height, block_time, value, notes in rows:
             val_text = '<span class="negativeValue">' if value < 0 else ''
-            val_text += format_satoshis(value, chain)
+            val_text += format_satoshis(value, chain, True)
             if value < 0:
                 val_text += '</span>'
 
@@ -1665,10 +1659,8 @@ class Abe:
             ])
 
         balance = abe.store.selectrow("SELECT balance FROM balances WHERE id = ?", (wallet_id,))[0]
-        print count,
-        print " - ",
-        print type(count)
-        abe.create_nav_table(page, wallet + " Wallet (Balance: " + format_satoshis(balance, chain) + ")", count, max_order_id, hi, columns, table_rows)
+
+        abe.create_nav_table(page, wallet + " Wallet (Balance: " + format_satoshis(balance, chain, True) + ")", count, max_order_id, hi, columns, table_rows)
 
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
@@ -2199,19 +2191,19 @@ def format_time(nTime):
     import time
     return time.strftime('%d %b %Y, %H:%M:%S', time.gmtime(int(nTime)))
 
-def format_satoshis(satoshis, chain):
+def format_satoshis(satoshis, chain, commas=False):
     decimals = DEFAULT_DECIMALS if chain.decimals is None else chain.decimals
     coin = 10 ** decimals
 
     if satoshis is None:
         return ''
     if satoshis < 0:
-        return '-' + format_satoshis(-satoshis, chain)
+        return '-' + format_satoshis(-satoshis, chain, commas)
 
     satoshis = int(satoshis)
     integer = satoshis / coin
     frac = satoshis % coin
-    return ("{:,}".format(integer) +
+    return (("{:" + "," * commas + "}").format(integer) +
             ('.' + (('0' * decimals) + str(frac))[-decimals:])
             .rstrip('0').rstrip('.'))
 
