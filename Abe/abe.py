@@ -2193,10 +2193,11 @@ def format_satoshis(satoshis, chain):
         return ''
     if satoshis < 0:
         return '-' + format_satoshis(-satoshis, chain)
+
     satoshis = int(satoshis)
     integer = satoshis / coin
     frac = satoshis % coin
-    return (str(integer) +
+    return ("{:,}".format(integer) +
             ('.' + (('0' * decimals) + str(frac))[-decimals:])
             .rstrip('0').rstrip('.'))
 
