@@ -1618,6 +1618,8 @@ class Abe:
         except KeyError:
             return PageNotFound()
 
+        chain = abe.chain_lookup_by_name("Latium")
+
         max_order_id = abe.store.get_last_order_id(wallet_id)
         count, hi = abe.get_count_high(page, max_order_id)
         
@@ -1646,11 +1648,13 @@ class Abe:
                 block_hash +
                 '">' + str(block_height) + '</a>',
                 format_time(int(block_time)),
-                format_satoshis(value, abe.chain_lookup_by_name("Latium")),
+                format_satoshis(value, chain),
                 notes
             ])
 
-        abe.create_nav_table(page, wallet + " Wallet", count, max_order_id, hi, columns, table_rows)
+        balance = abe.store.selectrow("SELECT balance FROM balances WHERE id = ?", (wallet_id,))[0]
+
+        abe.create_nav_table(page, wallet + " Wallet (Balance: " + format_satoshis(balance, chain) + ")", count, max_order_id, hi, columns, table_rows)
 
     def handle_q(abe, page):
         cmd = wsgiref.util.shift_path_info(page['env'])
