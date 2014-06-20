@@ -1555,7 +1555,14 @@ class Abe:
                  
         for c in (20, 50, 100, 500, 1000):
             nav += [' ']
+            print c,
+            print " C ",
+            print type(c),
+            print count,
+            print " count ",
+            print type(count)
             if c != count:
+                print "HERE"
                 nav += ['<a href="', basename, '?count=', str(c)]
                 if hi is not None:
                     nav += ['&amp;hi=', str(hi)]
