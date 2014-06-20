@@ -1640,6 +1640,11 @@ class Abe:
         table_rows = []
 
         for tx_hash, block_hash, block_height, block_time, value, notes in rows:
+            val_text = '<span class="negativeValue">' if value < 0 else ''
+            val_text += format_satoshis(value, chain)
+            if value < 0:
+                val_text += '</span>'
+
             table_rows.append([
                 '<a href="' + page['dotdot'] + 'tx/' +
                 tx_hash +
@@ -1648,7 +1653,7 @@ class Abe:
                 block_hash +
                 '">' + str(block_height) + '</a>',
                 format_time(int(block_time)),
-                format_satoshis(value, chain),
+                val_text,
                 notes
             ])
 
