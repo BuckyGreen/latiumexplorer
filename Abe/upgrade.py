@@ -1026,7 +1026,7 @@ upgrades = [
     ('Abe36',   add_chain_decimals),     # Fast
     ('Abe36.1', insert_chain_novacoin),  # Fast
     ('Abe37',   add_transparency_tables),
-    ('Abe37-lat1', None)
+    ('Abe37.1', None)
 ]
 
 def upgrade_schema(store):
