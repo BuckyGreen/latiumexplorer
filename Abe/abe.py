@@ -1658,7 +1658,9 @@ class Abe:
             ])
 
         balance = abe.store.selectrow("SELECT balance FROM balances WHERE id = ?", (wallet_id,))[0]
-
+        print count,
+        print " - ",
+        print type(count)
         abe.create_nav_table(page, wallet + " Wallet (Balance: " + format_satoshis(balance, chain) + ")", count, max_order_id, hi, columns, table_rows)
 
     def handle_q(abe, page):
