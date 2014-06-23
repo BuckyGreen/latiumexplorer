@@ -218,6 +218,7 @@ class Abe:
             "dotdot": "../" * (env['PATH_INFO'].count('/') - 1),
             "start_response": start_response,
             "content_type": str(abe.template_vars['CONTENT_TYPE']),
+            "extra_headers": [],
             "template": abe.template,
             "chain": None,
             }
@@ -268,7 +269,7 @@ class Abe:
         abe.store.rollback()  # Close implicitly opened transaction.
 
         start_response(status, [('Content-type', page['content_type']),
-                                ('Cache-Control', 'max-age=30')])
+                                ('Cache-Control', 'max-age=30')] + page['extra_headers'])
 
         tvars['title'] = flatten(page['title'])
         tvars['h1'] = flatten(page.get('h1') or page['title'])
@@ -1535,6 +1536,7 @@ class Abe:
         return json.dumps({ 'unspent_outputs': out }, sort_keys=True, indent=2)
 
     def do_raw(abe, page, func):
+        page['extra_headers'] = [('Access-Control-Allow-Origin', '*')]
         page['content_type'] = 'text/plain'
         page['template'] = '%(body)s'
         page['body'] = func(page, page['chain'])
