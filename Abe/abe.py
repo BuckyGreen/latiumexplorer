@@ -246,7 +246,8 @@ class Abe:
                 # cron job.
                 abe.store.catch_up()
             
-	    page['body'] += abe.search_form(page)
+            if "wallets" in cmd:
+                page['body'] += abe.search_form(page)
 
             handler(page)
         except PageNotFound:
