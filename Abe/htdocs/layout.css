@@ -341,7 +341,6 @@ margin-top: 20%;
 
 
 section#main {
-background: url("sidebar_shadow.png") repeat-y scroll left top transparent;
 float: left;
 margin-top: -2px;
 min-height: 85%;
