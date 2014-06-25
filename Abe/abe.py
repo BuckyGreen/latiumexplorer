@@ -251,7 +251,7 @@ class Abe:
             if "wallets" not in cmd:
                 page['body'] += abe.search_form(page)
             else:
-                del tvars['api_pages']
+                tvars['api_pages'] = ''
 
             handler(page)
         except PageNotFound:
