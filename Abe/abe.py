@@ -57,6 +57,7 @@ EPOCH1970 = calendar.timegm(TIME1970)
 # under Internet Explorer.
 DEFAULT_CONTENT_TYPE = "text/html; charset=utf-8"
 DEFAULT_HOMEPAGE = "chains";
+DEFAULT_API_PAGES = '<p><a href="%(dotdot)sq">API</a> (machine-readable pages)</p>'
 DEFAULT_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -71,8 +72,8 @@ DEFAULT_TEMPLATE = """
     <section id="main">
     %(body)s
         <div id="footer">
-            <p><a href="%(dotdot)sq">API</a> (machine-readable pages)</p>
             <p style="font-size: smaller">
+                %(api_pages)s
                 <span style="font-style: italic">
                     Powered by <a href="%(ABE_URL)s">%(APPNAME)s</a>
                 </span>
@@ -234,6 +235,7 @@ class Abe:
 
         tvars = abe.template_vars.copy()
         tvars['dotdot'] = page['dotdot']
+        tvars['api_pages'] = DEFAULT_API_PAGES
         page['template_vars'] = tvars
 
         try:
@@ -248,6 +250,8 @@ class Abe:
             
             if "wallets" not in cmd:
                 page['body'] += abe.search_form(page)
+            else:
+                del tvars['api_pages']
 
             handler(page)
         except PageNotFound:
