@@ -68,7 +68,7 @@ DEFAULT_TEMPLATE = """
     %(extraHead)s
     <title>%(title)s</title>
 </head>
-<body onload="parent.explorerLoaded()">
+<body onload="parent.postMessage(['loaded', document.getElementById('footer').offsetTop + document.getElementById('footer').clientHeight], '*');">
     <section id="main">
     %(body)s
         <div id="footer">
@@ -235,7 +235,7 @@ class Abe:
 
         tvars = abe.template_vars.copy()
         tvars['dotdot'] = page['dotdot']
-        tvars['api_pages'] = DEFAULT_API_PAGES
+        tvars['api_pages'] = DEFAULT_API_PAGES % tvars
         page['template_vars'] = tvars
 
         try:
@@ -1654,12 +1654,12 @@ class Abe:
                 val_text += '</span>'
 
             table_rows.append([
-                '<a href="' + page['dotdot'] + 'tx/' +
+                '<a href="#" onclick="parent.postMessage([\'link\', \'' + wsgiref.util.application_uri(page['env']) + '/../../' + page['dotdot'] + 'tx/' +
                 tx_hash +
-                '">' + tx_hash[:20] + '...</a>',
-                '<a href="' + page['dotdot'] + 'block/' +
+                '\'], \'*\');">' + tx_hash[:20] + '...</a>',
+                '<a href="#" onclick="parent.postMessage([\'link\', \'' + wsgiref.util.application_uri(page['env']) + '/../../' + page['dotdot'] + 'block/' +
                 block_hash +
-                '">' + str(block_height) + '</a>',
+                '\'], \'*\');">' + str(block_height) + '</a>',
                 format_time(int(block_time)),
                 val_text,
                 notes
