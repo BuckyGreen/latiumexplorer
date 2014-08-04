@@ -442,7 +442,7 @@ class Abe:
             value_out = int(value_out)
             seconds = int(seconds)
             satoshis = int(satoshis)
-            ss = int(ss
+            ss = int(ss)
             total_ss = int(total_ss)
 
             if satoshis == 0:
