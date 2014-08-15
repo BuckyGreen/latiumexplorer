@@ -1146,7 +1146,7 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
         initialAddrs = [
             ["Premine Wallet", "AVtVnLVqQKRLrjUegpCxRLFVXGJBYDww3U"],
             ["Holding Wallet", "AVB1kxynHkmvGaCemz1hWjY2aGomDVeGdV"],
-            ["Payout Wallet",  "AMXc1icADQEV5V576wD9cqoWo3Pj1N4tZV"],
+            ["Payout Wallet",  "AXwFEcoKpjZArzuRMgwFpTrEj2sz1vGcni"],
             ["Admin Wallet",   "AdeFHiHAvw1ADDPL8FgfPb3DDaTKZuKx1i"],
         ]
             
